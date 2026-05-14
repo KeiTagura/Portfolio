@@ -1,0 +1,32 @@
+---
+import { withBase } from "../utils/paths";
+
+interface Props {
+  eyebrow?: string;
+  kicker?: string;
+  title: string;
+  intro: string;
+  backgroundImage?: string;
+  backgroundAlt?: string;
+  visualAccent?: string;
+}
+
+const { eyebrow, kicker, title, intro, backgroundImage, backgroundAlt = "", visualAccent } = Astro.props;
+const headerStyle = visualAccent ? `--page-accent: ${visualAccent};` : undefined;
+const label = eyebrow ?? kicker;
+---
+
+<header class:list={["page-header", { "has-page-media": Boolean(backgroundImage) }]} style={headerStyle}>
+  {
+    backgroundImage && (
+      <div class="page-header-media" aria-hidden={backgroundAlt ? undefined : "true"}>
+        <img src={withBase(backgroundImage)} alt={backgroundAlt} loading="eager" />
+      </div>
+    )
+  }
+  <div class="page-header-content">
+    {label && <p class="eyebrow">{label}</p>}
+    <h1>{title}</h1>
+    <p>{intro}</p>
+  </div>
+</header>

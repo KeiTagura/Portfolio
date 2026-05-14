@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 620" role="img" aria-label="Abstract communication links background">
+  <rect width="1400" height="620" fill="#11141c"/>
+  <g transform="translate(760 120)">
+    <rect x="0" y="0" width="380" height="88" rx="8" fill="#1d2530" stroke="#ffffff" stroke-opacity=".14"/>
+    <rect x="0" y="116" width="380" height="88" rx="8" fill="#1d2530" stroke="#ffffff" stroke-opacity=".14"/>
+    <rect x="0" y="232" width="380" height="88" rx="8" fill="#1d2530" stroke="#ffffff" stroke-opacity=".14"/>
+    <circle cx="46" cy="44" r="18" fill="#57d5ff"/>
+    <circle cx="46" cy="160" r="18" fill="#ffcf5a"/>
+    <circle cx="46" cy="276" r="18" fill="#ff6f91"/>
+    <rect x="86" y="30" width="190" height="12" fill="#ffffff" opacity=".34"/>
+    <rect x="86" y="146" width="240" height="12" fill="#ffffff" opacity=".34"/>
+    <rect x="86" y="262" width="210" height="12" fill="#ffffff" opacity=".34"/>
+  </g>
+  <path d="M150 420 C290 250 440 520 610 340" fill="none" stroke="#ffcf5a" stroke-width="10" opacity=".58"/>
+  <circle cx="240" cy="240" r="80" fill="none" stroke="#57d5ff" stroke-width="8" opacity=".6"/>
+</svg>

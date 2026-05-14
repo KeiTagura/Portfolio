@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 620" role="img" aria-label="Abstract portrait and workspace background">
+  <rect width="1400" height="620" fill="#11141c"/>
+  <g transform="translate(835 90)">
+    <rect x="0" y="0" width="310" height="400" rx="8" fill="#1d2530" stroke="#ffffff" stroke-opacity=".14"/>
+    <circle cx="155" cy="145" r="82" fill="#26384c"/>
+    <path d="M60 340 C94 268 118 252 155 252 S216 268 250 340Z" fill="#2f4058"/>
+    <path d="M78 145 C98 86 212 86 232 145 C198 112 112 112 78 145Z" fill="#ff6f91" opacity=".78"/>
+  </g>
+  <g stroke="#57d5ff" stroke-width="4" opacity=".42">
+    <path d="M160 160h430M160 220h320M160 280h380"/>
+  </g>
+  <circle cx="520" cy="420" r="78" fill="none" stroke="#ffcf5a" stroke-width="10" opacity=".68"/>
+</svg>

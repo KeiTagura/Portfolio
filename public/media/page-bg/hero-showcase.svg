@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" role="img" aria-label="Abstract realtime game development showcase">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#07131c"/>
+      <stop offset="0.55" stop-color="#171b28"/>
+      <stop offset="1" stop-color="#331525"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" x2="1">
+      <stop offset="0" stop-color="#57d5ff"/>
+      <stop offset="1" stop-color="#8effd2"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" x2="1">
+      <stop offset="0" stop-color="#ffcf5a"/>
+      <stop offset="1" stop-color="#ff6f91"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#bg)"/>
+  <g opacity=".22" stroke="#fff" stroke-width="1">
+    <path d="M0 760 C260 620 360 860 600 720 S1000 520 1600 700" fill="none"/>
+    <path d="M0 820 C240 680 420 900 680 760 S1140 560 1600 760" fill="none"/>
+  </g>
+  <g transform="translate(790 230)">
+    <path d="M0 470 260 20 540 470Z" fill="#101826" stroke="#57d5ff" stroke-width="4"/>
+    <path d="M142 470 260 150 390 470Z" fill="#172535" stroke="#ffcf5a" stroke-width="3"/>
+    <circle cx="260" cy="160" r="46" fill="url(#cyan)"/>
+    <path d="M92 390h360" stroke="#57d5ff" stroke-width="5"/>
+    <path d="M154 300h232" stroke="#ff6f91" stroke-width="4"/>
+  </g>
+  <g transform="translate(1010 650)">
+    <rect x="0" y="0" width="420" height="190" rx="10" fill="#121824" stroke="#ffffff" stroke-opacity=".18"/>
+    <rect x="24" y="26" width="160" height="18" fill="url(#cyan)"/>
+    <rect x="24" y="64" width="330" height="12" fill="#ffffff" opacity=".32"/>
+    <rect x="24" y="94" width="270" height="12" fill="#ffffff" opacity=".2"/>
+    <rect x="24" y="134" width="86" height="28" fill="url(#gold)"/>
+    <rect x="124" y="134" width="86" height="28" fill="#263142"/>
+  </g>
+  <g transform="translate(580 590)" fill="none" stroke-width="10">
+    <circle cx="0" cy="0" r="74" stroke="#57d5ff"/>
+    <circle cx="0" cy="0" r="124" stroke="#ffcf5a" opacity=".7"/>
+    <path d="M-210 0h420M0-210v420" stroke="#fff" opacity=".18"/>
+  </g>
+</svg>

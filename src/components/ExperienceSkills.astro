@@ -1,0 +1,81 @@
+---
+import SectionHeader from "@components/SectionHeader.astro";
+import { hardSkills, languages, softSkills, workExperience } from "@data/resume";
+import { getUi } from "@data/ui";
+import { withBase } from "../utils/paths";
+
+interface Props {
+  id?: string;
+  showHeader?: boolean;
+  variant?: "home" | "page";
+}
+
+const { id, variant = "home" } = Astro.props;
+const showHeader = Astro.props.showHeader ?? variant === "home";
+const ui = getUi();
+---
+
+<section class:list={["page-section", "experience-section", `section-${variant}`]} id={id}>
+  {
+    showHeader && (
+      <SectionHeader
+        eyebrow={ui.sections.experience.eyebrow}
+        title={ui.sections.experience.title}
+        description={ui.sections.experience.compactIntro}
+        actionHref={withBase("/experience")}
+        actionLabel={ui.sections.experience.actionLabel}
+        variant="compact"
+      />
+    )
+  }
+  <div class="experience-layout">
+    <div class="timeline">
+      {workExperience.map((item) => (
+        <article class="timeline-item">
+          <p>{item.startDate} - {item.endDate}</p>
+          <h3>{item.title}</h3>
+          <strong>{item.company}</strong>
+          <span class="timeline-location">{item.location}</span>
+          <p>{item.summary}</p>
+          <ul>
+            {item.bullets.map((bullet) => <li>{bullet}</li>)}
+          </ul>
+          {
+            item.projectLinks.length > 0 && (
+              <div class="timeline-links">
+                {item.projectLinks.map((link) => <a href={withBase(link.href)}>{link.label}</a>)}
+              </div>
+            )
+          }
+        </article>
+      ))}
+    </div>
+    <aside class="skills-panel">
+      <section>
+        <h3>Hard Skills</h3>
+        <div class="skill-category-grid">
+          {hardSkills.map((group) => (
+            <div class="skill-category">
+              <h4>{group.category}</h4>
+              <div class="tag-list">
+                {group.skills.map((skill) => <span>{skill}</span>)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+      <section>
+        <h3>Soft Skills</h3>
+        <div class="tag-list">
+          {softSkills.map((skill) => <span>{skill}</span>)}
+        </div>
+      </section>
+      <section>
+        <h3>Languages</h3>
+        <ul class="language-list">
+          {languages.map((language) => <li><span>{language.name}</span><span>{language.level}</span></li>)}
+        </ul>
+      </section>
+    </aside>
+  </div>
+</section>

@@ -1,0 +1,14 @@
+---
+import GalleryGrid from "@components/GalleryGrid.astro";
+import PageHeader from "@components/PageHeader.astro";
+import { site } from "@config/site";
+import BaseLayout from "@layouts/BaseLayout.astro";
+
+const header = site.pageHeaders.gallery;
+const meta = site.pages.gallery;
+---
+
+<BaseLayout title={meta.title} description={meta.description}>
+  <PageHeader {...header} />
+  <GalleryGrid variant="page" />
+</BaseLayout>

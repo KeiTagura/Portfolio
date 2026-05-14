@@ -1,0 +1,14 @@
+---
+import ExperienceSkills from "@components/ExperienceSkills.astro";
+import PageHeader from "@components/PageHeader.astro";
+import { site } from "@config/site";
+import BaseLayout from "@layouts/BaseLayout.astro";
+
+const header = site.pageHeaders.experience;
+const meta = site.pages.experience;
+---
+
+<BaseLayout title={meta.title} description={meta.description}>
+  <PageHeader {...header} />
+  <ExperienceSkills variant="page" />
+</BaseLayout>

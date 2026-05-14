@@ -1,0 +1,101 @@
+---
+import NavBar from "@components/NavBar.astro";
+import SEO from "@components/SEO.astro";
+import { site } from "@config/site";
+import { ClientRouter } from "astro:transitions";
+import { withBase } from "../utils/paths";
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+}
+
+const { title = site.title, description = site.description, image = site.ogImage } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="generator" content={Astro.generator} />
+    <SEO title={title} description={description} image={image} />
+    <link rel="icon" href={withBase(site.favicon)} type="image/svg+xml" />
+    <ClientRouter />
+  </head>
+  <body>
+    <NavBar />
+    <main>
+      <slot />
+    </main>
+    <script>
+      const revealSelectors = [
+        ".page-header",
+        ".page-section > .section-header",
+        ".project-card",
+        ".gallery-item",
+        ".about-layout",
+        ".timeline-item",
+        ".skills-panel",
+        ".contact-card",
+      ];
+
+      let revealObserver: IntersectionObserver | undefined;
+
+      function setupScrollReveal() {
+        revealObserver?.disconnect();
+
+        const elements = Array.from(document.querySelectorAll<HTMLElement>(revealSelectors.join(",")));
+        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        if (reduceMotion) {
+          elements.forEach((element) => {
+            element.classList.add("reveal-on-scroll", "is-revealed");
+          });
+          return;
+        }
+
+        revealObserver = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (!entry.isIntersecting) {
+                return;
+              }
+
+              entry.target.classList.add("is-revealed");
+              revealObserver?.unobserve(entry.target);
+            });
+          },
+          {
+            rootMargin: "0px 0px -12% 0px",
+            threshold: 0.12,
+          },
+        );
+
+        elements.forEach((element, index) => {
+          element.classList.add("reveal-on-scroll");
+          element.style.setProperty("--reveal-delay", `${Math.min(index % 6, 5) * 45}ms`);
+
+          const rect = element.getBoundingClientRect();
+          if (rect.top < window.innerHeight * 0.92) {
+            element.classList.add("is-revealed");
+            return;
+          }
+
+          element.classList.remove("is-revealed");
+          revealObserver?.observe(element);
+        });
+      }
+
+      document.addEventListener("astro:page-load", setupScrollReveal);
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", setupScrollReveal, { once: true });
+      } else {
+        setupScrollReveal();
+      }
+    </script>
+  </body>
+</html>

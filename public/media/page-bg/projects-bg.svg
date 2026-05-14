@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 620" role="img" aria-label="Abstract project showcase background">
+  <rect width="1400" height="620" fill="#10141d"/>
+  <path d="M0 470 C220 340 360 560 570 420 S930 280 1400 430 V620 H0Z" fill="#172333"/>
+  <g transform="translate(780 90)" opacity=".95">
+    <rect x="0" y="0" width="440" height="290" rx="10" fill="#1d2530" stroke="#ffffff" stroke-opacity=".16"/>
+    <rect x="28" y="30" width="180" height="18" fill="#57d5ff"/>
+    <rect x="28" y="76" width="360" height="120" fill="#101722"/>
+    <path d="M70 178 156 76 242 178Z" fill="#26384c" stroke="#57d5ff" stroke-width="4"/>
+    <circle cx="320" cy="122" r="38" fill="#ffcf5a"/>
+    <rect x="28" y="224" width="110" height="28" fill="#ff6f91"/>
+    <rect x="154" y="224" width="110" height="28" fill="#263142"/>
+  </g>
+  <g stroke="#57d5ff" stroke-width="3" opacity=".45">
+    <path d="M120 130h340M120 180h260M120 230h390"/>
+  </g>
+</svg>

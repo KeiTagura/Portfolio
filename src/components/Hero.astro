@@ -1,0 +1,22 @@
+---
+import { links } from "@data/links";
+import { withBase } from "../utils/paths";
+---
+
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-media" aria-hidden="true">
+    <img src={withBase("/media/page-bg/hero-showcase.svg")} alt="" loading="eager" />
+  </div>
+  <div class="hero-content">
+    <p class="eyebrow">Game Developer / Technical Artist</p>
+    <h1 id="hero-title">Realtime prototypes, tools, shaders, and visual systems.</h1>
+    <p class="hero-copy">
+      A static portfolio foundation for polished project showcases, gallery media, technical breakdowns, and
+      production experience.
+    </p>
+    <div class="hero-actions">
+      <a class="button primary" href={withBase("/projects")}>View Projects</a>
+      <a class="button secondary" href={withBase(links.cv)}>Download CV</a>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,38 @@
+---
+import ContactButton from "@components/ContactButton.astro";
+import SectionHeader from "@components/SectionHeader.astro";
+import { primaryContactLinks, profileLinks } from "@data/links";
+import { getUi } from "@data/ui";
+import { withBase } from "../utils/paths";
+
+interface Props {
+  id?: string;
+  showHeader?: boolean;
+  variant?: "home" | "page";
+}
+
+const { id, variant = "home" } = Astro.props;
+const showHeader = Astro.props.showHeader ?? variant === "home";
+const ui = getUi();
+---
+
+<section class:list={["page-section", "contact-section", `section-${variant}`]} id={id}>
+  {
+    showHeader && (
+      <SectionHeader
+        eyebrow={ui.sections.contact.eyebrow}
+        title={ui.sections.contact.title}
+        description={ui.sections.contact.compactIntro}
+        actionHref={withBase("/contact")}
+        actionLabel={ui.sections.contact.actionLabel}
+        variant="compact"
+      />
+    )
+  }
+  <div class="contact-grid">
+    {primaryContactLinks.map((link) => <ContactButton {...link} />)}
+  </div>
+  <div class="profile-link-grid" aria-label="Additional profile links">
+    {profileLinks.map((link) => <ContactButton {...link} />)}
+  </div>
+</section>

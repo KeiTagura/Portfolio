@@ -1,0 +1,14 @@
+---
+import ContactSection from "@components/ContactSection.astro";
+import PageHeader from "@components/PageHeader.astro";
+import { site } from "@config/site";
+import BaseLayout from "@layouts/BaseLayout.astro";
+
+const header = site.pageHeaders.contact;
+const meta = site.pages.contact;
+---
+
+<BaseLayout title={meta.title} description={meta.description}>
+  <PageHeader {...header} />
+  <ContactSection variant="page" />
+</BaseLayout>

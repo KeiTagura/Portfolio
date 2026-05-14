@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 620" role="img" aria-label="Abstract gallery contact sheet background">
+  <rect width="1400" height="620" fill="#11141c"/>
+  <g transform="translate(640 70)" opacity=".95">
+    <rect width="170" height="130" rx="8" fill="#1d2530" stroke="#ffffff" stroke-opacity=".14"/>
+    <rect x="198" width="170" height="130" rx="8" fill="#1d2530" stroke="#ffffff" stroke-opacity=".14"/>
+    <rect x="396" width="170" height="130" rx="8" fill="#1d2530" stroke="#ffffff" stroke-opacity=".14"/>
+    <rect y="158" width="170" height="130" rx="8" fill="#1d2530" stroke="#ffffff" stroke-opacity=".14"/>
+    <rect x="198" y="158" width="170" height="130" rx="8" fill="#1d2530" stroke="#ffffff" stroke-opacity=".14"/>
+    <rect x="396" y="158" width="170" height="130" rx="8" fill="#1d2530" stroke="#ffffff" stroke-opacity=".14"/>
+    <circle cx="84" cy="66" r="36" fill="#ffcf5a"/>
+    <path d="M226 104 284 34 340 104Z" fill="#57d5ff"/>
+    <path d="M428 104 C460 42 512 42 540 104Z" fill="#ff6f91"/>
+    <path d="M28 262 C74 206 106 306 146 246" fill="none" stroke="#57d5ff" stroke-width="8"/>
+    <rect x="226" y="204" width="114" height="40" fill="#ffcf5a"/>
+    <circle cx="482" cy="224" r="46" fill="none" stroke="#ff6f91" stroke-width="10"/>
+  </g>
+  <path d="M0 500 C260 380 410 570 690 450 S1040 330 1400 450 V620 H0Z" fill="#1a2230"/>
+</svg>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 675" role="img" aria-label="Impact VFX timing sheet">
+  <rect width="900" height="675" fill="#11141c"/>
+  <g transform="translate(450 330)" fill="none">
+    <circle r="70" stroke="#ffcf5a" stroke-width="12"/>
+    <circle r="150" stroke="#57d5ff" stroke-width="7" opacity=".75"/>
+    <circle r="240" stroke="#ff6f91" stroke-width="4" opacity=".6"/>
+    <g stroke="#ffffff" stroke-width="5" opacity=".45">
+      <path d="M0-285 V-160"/>
+      <path d="M0 160 V285"/>
+      <path d="M-285 0 H-160"/>
+      <path d="M160 0 H285"/>
+      <path d="M-205-205 -110-110"/>
+      <path d="M205 205 110 110"/>
+      <path d="M205-205 110-110"/>
+      <path d="M-205 205 -110 110"/>
+    </g>
+  </g>
+  <rect x="60" y="570" width="780" height="32" fill="#0b1018"/>
+  <rect x="90" y="570" width="80" height="32" fill="#57d5ff"/>
+  <rect x="220" y="570" width="120" height="32" fill="#ffcf5a"/>
+  <rect x="430" y="570" width="180" height="32" fill="#ff6f91"/>
+</svg>

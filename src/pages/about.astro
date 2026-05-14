@@ -1,0 +1,14 @@
+---
+import AboutSection from "@components/AboutSection.astro";
+import PageHeader from "@components/PageHeader.astro";
+import { site } from "@config/site";
+import BaseLayout from "@layouts/BaseLayout.astro";
+
+const header = site.pageHeaders.about;
+const meta = site.pages.about;
+---
+
+<BaseLayout title={meta.title} description={meta.description}>
+  <PageHeader {...header} />
+  <AboutSection variant="page" />
+</BaseLayout>

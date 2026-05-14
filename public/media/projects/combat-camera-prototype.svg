@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" role="img" aria-label="Combat camera prototype preview">
+  <rect width="1200" height="750" fill="#11141c"/>
+  <circle cx="600" cy="360" r="250" fill="none" stroke="#57d5ff" stroke-width="8"/>
+  <circle cx="600" cy="360" r="100" fill="none" stroke="#ffcf5a" stroke-width="6"/>
+  <path d="M600 110 650 310 850 360 650 410 600 610 550 410 350 360 550 310Z" fill="#1d2530" stroke="#ff6f91" stroke-width="5"/>
+  <path d="M180 570 C320 480 430 650 560 540 S780 450 1020 560" fill="none" stroke="#ffffff" stroke-opacity=".22" stroke-width="10"/>
+  <rect x="70" y="70" width="260" height="96" rx="8" fill="#0b1018" stroke="#ffffff" stroke-opacity=".16"/>
+  <rect x="92" y="94" width="160" height="14" fill="#57d5ff"/>
+  <rect x="92" y="126" width="210" height="12" fill="#ffffff" opacity=".28"/>
+</svg>

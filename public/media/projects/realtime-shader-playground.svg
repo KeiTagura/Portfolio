@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" role="img" aria-label="Realtime shader playground preview">
+  <rect width="1200" height="750" fill="#0b1018"/>
+  <path d="M0 570 C200 470 280 620 470 520 S790 390 1200 520 V750 H0Z" fill="#172535"/>
+  <path d="M120 560 310 230 500 560Z" fill="#213448" stroke="#57d5ff" stroke-width="6"/>
+  <path d="M310 230 430 560 H190Z" fill="#2e4058"/>
+  <circle cx="860" cy="230" r="120" fill="#ffcf5a"/>
+  <circle cx="860" cy="230" r="170" fill="none" stroke="#ffcf5a" stroke-opacity=".35" stroke-width="12"/>
+  <g stroke="#57d5ff" stroke-width="5" opacity=".8">
+    <path d="M660 500 C720 410 810 580 900 470 S1030 420 1100 500" fill="none"/>
+    <path d="M670 548 C760 480 830 620 960 520 S1070 500 1130 550" fill="none"/>
+  </g>
+</svg>

@@ -1,0 +1,23 @@
+---
+import { withBase } from "../utils/paths";
+
+interface Props {
+  label: string;
+  href: string;
+  detail: string;
+  kind?: string;
+  primary?: boolean;
+}
+
+const { label, href, detail, kind = "profile", primary = false } = Astro.props;
+const isDownload = kind === "download";
+---
+
+<a
+  class:list={["contact-card", { "contact-card-primary": primary }]}
+  href={withBase(href)}
+  download={isDownload ? true : undefined}
+>
+  <span>{label}</span>
+  <strong>{detail}</strong>
+</a>

@@ -1,0 +1,13 @@
+---
+import { galleryFilters } from "@data/ui";
+---
+
+<div class="gallery-filter" aria-label="Gallery filters">
+  {
+    galleryFilters.map((filter) => (
+      <button type="button" data-gallery-filter={filter} aria-pressed={filter === "All" ? "true" : "false"}>
+        {filter}
+      </button>
+    ))
+  }
+</div>

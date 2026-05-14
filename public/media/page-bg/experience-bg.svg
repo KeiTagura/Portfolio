@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 620" role="img" aria-label="Abstract production timeline background">
+  <rect width="1400" height="620" fill="#0d121a"/>
+  <g transform="translate(720 110)">
+    <path d="M0 40h470M0 170h470M0 300h470" stroke="#ffffff" stroke-opacity=".16" stroke-width="2"/>
+    <circle cx="42" cy="40" r="24" fill="#57d5ff"/>
+    <circle cx="210" cy="170" r="24" fill="#8effd2"/>
+    <circle cx="382" cy="300" r="24" fill="#ffcf5a"/>
+    <rect x="82" y="18" width="250" height="44" rx="6" fill="#1d2530"/>
+    <rect x="250" y="148" width="210" height="44" rx="6" fill="#1d2530"/>
+    <rect x="62" y="278" width="260" height="44" rx="6" fill="#1d2530"/>
+  </g>
+  <g transform="translate(130 130)" opacity=".72">
+    <rect width="380" height="270" rx="10" fill="#151d28" stroke="#ffffff" stroke-opacity=".14"/>
+    <rect x="30" y="34" width="160" height="16" fill="#8effd2"/>
+    <rect x="30" y="82" width="290" height="12" fill="#ffffff" opacity=".24"/>
+    <rect x="30" y="118" width="240" height="12" fill="#ffffff" opacity=".18"/>
+    <rect x="30" y="176" width="90" height="30" fill="#57d5ff"/>
+    <rect x="136" y="176" width="90" height="30" fill="#ffcf5a"/>
+  </g>
+</svg>

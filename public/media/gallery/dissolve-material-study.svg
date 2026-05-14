@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 675" role="img" aria-label="Dissolve material shader study">
+  <rect width="900" height="675" fill="#0a0c11"/>
+  <path d="M210 560 C260 360 300 170 450 150 C610 130 690 340 700 560Z" fill="#182433"/>
+  <path d="M250 520 C310 390 300 240 450 220 C570 200 640 350 665 520Z" fill="#57d5ff" opacity=".3"/>
+  <path d="M275 500 C360 430 345 300 460 290 C555 282 610 390 635 500Z" fill="#ffcf5a"/>
+  <g fill="#ff6f91">
+    <circle cx="300" cy="260" r="14"/>
+    <circle cx="570" cy="230" r="11"/>
+    <circle cx="640" cy="350" r="18"/>
+    <circle cx="250" cy="420" r="10"/>
+    <circle cx="525" cy="510" r="15"/>
+  </g>
+</svg>

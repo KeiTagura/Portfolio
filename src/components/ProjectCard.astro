@@ -1,0 +1,38 @@
+---
+import type { CollectionEntry } from "astro:content";
+import { getUi } from "@data/ui";
+import { withBase } from "../utils/paths";
+
+interface Props {
+  project: CollectionEntry<"projects">;
+  variant?: "home" | "page";
+  index: number;
+}
+
+const { project, variant = "home", index } = Astro.props;
+const { data } = project;
+const ui = getUi();
+---
+
+<article class:list={["project-card", `project-card-${variant}`]}>
+  <button
+    type="button"
+    class="project-open-button"
+    data-project-lightbox-trigger
+    data-project-index={index}
+    data-media-type={data.mediaType}
+    data-media-src={withBase(data.mediaSrc)}
+    data-title={data.title}
+    aria-label={`${ui.common.openProject}: ${data.title}`}
+  ></button>
+  <div class="project-image" aria-hidden="true">
+    <img src={withBase(data.thumbnail)} alt={`${data.title} preview`} loading="lazy" />
+  </div>
+  <div class="project-body">
+    <div class="project-meta">
+      <span>{data.role}</span>
+    </div>
+    <h3>{data.title}</h3>
+    <p>{data.description}</p>
+  </div>
+</article>

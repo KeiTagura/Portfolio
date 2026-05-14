@@ -1,0 +1,222 @@
+---
+import { render, type CollectionEntry } from "astro:content";
+import { getUi } from "@data/ui";
+import { withBase } from "../utils/paths";
+
+interface Props {
+  projects: CollectionEntry<"projects">[];
+}
+
+const { projects } = Astro.props;
+const ui = getUi();
+const renderedProjects = await Promise.all(
+  projects.map(async (project) => ({
+    project,
+    ...(await render(project)),
+  })),
+);
+---
+
+<div class="project-lightbox" data-project-lightbox hidden>
+  <div class="project-lightbox-panel" data-project-lightbox-panel role="dialog" aria-modal="true" tabindex="-1">
+    <div class="project-lightbox-toolbar">
+      <button type="button" data-project-prev aria-label={`${ui.common.previous} project`}>{ui.common.previous}</button>
+      <button type="button" data-project-next aria-label={`${ui.common.next} project`}>{ui.common.next}</button>
+      <button type="button" data-project-close aria-label={ui.common.closePreview}>{ui.common.closePreview}</button>
+    </div>
+
+    <div class="project-lightbox-media">
+      <img data-project-image alt="" hidden />
+      <video data-project-video controls playsinline hidden></video>
+      <iframe data-project-embed title="Project media" loading="lazy" allowfullscreen hidden></iframe>
+      <a class="project-external-card" data-project-external href="#" target="_blank" rel="noreferrer" hidden>
+        <span>{ui.common.externalMedia}</span>
+        <strong data-project-external-label>{ui.common.externalMedia}</strong>
+      </a>
+    </div>
+
+    <div class="project-lightbox-details" data-project-details></div>
+  </div>
+</div>
+
+{
+  renderedProjects.map(({ project, Content }, index) => (
+    <template data-project-template={String(index)}>
+      <article class="project-lightbox-copy">
+        <div class="project-meta">
+          <span>{project.data.mediaType}</span>
+          <span>{project.data.role}</span>
+        </div>
+        <h2>{project.data.title}</h2>
+        {project.data.projectUrl && (
+          <a class="project-link" href={withBase(project.data.projectUrl)} target="_blank" rel="noreferrer">
+            {ui.common.viewProject}
+          </a>
+        )}
+        <dl class="project-detail-list">
+          <div>
+            <dt>{ui.common.role}</dt>
+            <dd>{project.data.role}</dd>
+          </div>
+          <div>
+            <dt>{ui.common.responsibilities}</dt>
+            <dd>
+              <ul>
+                {project.data.responsibilities.map((responsibility) => <li>{responsibility}</li>)}
+              </ul>
+            </dd>
+          </div>
+        </dl>
+        <p>{project.data.description}</p>
+        <div class="tag-list" aria-label={`${project.data.title} ${ui.common.tags}`}>
+          {project.data.tags.map((tag) => <span>{tag}</span>)}
+        </div>
+        <div class="project-markdown">
+          <Content />
+        </div>
+      </article>
+    </template>
+  ))
+}
+
+<script>
+  const projectLightbox = document.querySelector("[data-project-lightbox]");
+  const projectPanel = document.querySelector("[data-project-lightbox-panel]");
+  const projectImage = document.querySelector("[data-project-image]");
+  const projectVideo = document.querySelector("[data-project-video]");
+  const projectEmbed = document.querySelector("[data-project-embed]");
+  const projectExternal = document.querySelector("[data-project-external]");
+  const projectExternalLabel = document.querySelector("[data-project-external-label]");
+  const projectDetails = document.querySelector("[data-project-details]");
+  const closeProjectButton = document.querySelector("[data-project-close]");
+  const prevProjectButton = document.querySelector("[data-project-prev]");
+  const nextProjectButton = document.querySelector("[data-project-next]");
+  const projectTriggers = Array.from(document.querySelectorAll("[data-project-lightbox-trigger]"));
+  let currentProjectIndex = 0;
+  let previousFocus: Element | null = null;
+
+  function resetProjectMedia() {
+    if (projectImage instanceof HTMLImageElement) {
+      projectImage.hidden = true;
+      projectImage.removeAttribute("src");
+    }
+    if (projectVideo instanceof HTMLVideoElement) {
+      projectVideo.hidden = true;
+      projectVideo.pause();
+      projectVideo.removeAttribute("src");
+      projectVideo.load();
+    }
+    if (projectEmbed instanceof HTMLIFrameElement) {
+      projectEmbed.hidden = true;
+      projectEmbed.removeAttribute("src");
+    }
+    if (projectExternal instanceof HTMLAnchorElement) {
+      projectExternal.hidden = true;
+      projectExternal.href = "#";
+    }
+  }
+
+  function renderProjectMedia(trigger: HTMLElement) {
+    resetProjectMedia();
+    const mediaType = trigger.getAttribute("data-media-type") ?? "image";
+    const mediaSrc = trigger.getAttribute("data-media-src") ?? "";
+    const title = trigger.getAttribute("data-title") ?? "Project media";
+
+    if ((mediaType === "image" || mediaType === "gif") && projectImage instanceof HTMLImageElement) {
+      projectImage.src = mediaSrc;
+      projectImage.alt = `${title} media`;
+      projectImage.hidden = false;
+      return;
+    }
+
+    if (mediaType === "localVideo" && projectVideo instanceof HTMLVideoElement) {
+      projectVideo.src = mediaSrc;
+      projectVideo.hidden = false;
+      return;
+    }
+
+    if ((mediaType === "youtube" || mediaType === "vimeo") && projectEmbed instanceof HTMLIFrameElement) {
+      projectEmbed.src = mediaSrc;
+      projectEmbed.title = `${title} embedded media`;
+      projectEmbed.hidden = false;
+      return;
+    }
+
+    if (projectExternal instanceof HTMLAnchorElement) {
+      projectExternal.href = mediaSrc;
+      projectExternal.hidden = false;
+    }
+    if (projectExternalLabel instanceof HTMLElement) {
+      projectExternalLabel.textContent = `Open ${mediaType} media`;
+    }
+  }
+
+  function renderProjectDetails(index: number) {
+    if (!(projectDetails instanceof HTMLElement)) {
+      return;
+    }
+    const template = document.querySelector(`[data-project-template="${index}"]`);
+    if (template instanceof HTMLTemplateElement) {
+      projectDetails.replaceChildren(template.content.cloneNode(true));
+    }
+  }
+
+  function openProject(index: number) {
+    const normalizedIndex = (index + projectTriggers.length) % projectTriggers.length;
+    const trigger = projectTriggers[normalizedIndex];
+    if (!(trigger instanceof HTMLElement)) {
+      return;
+    }
+
+    currentProjectIndex = normalizedIndex;
+    previousFocus = document.activeElement;
+    renderProjectMedia(trigger);
+    renderProjectDetails(normalizedIndex);
+    projectLightbox?.removeAttribute("hidden");
+    document.body.classList.add("has-lightbox");
+    if (projectPanel instanceof HTMLElement) {
+      projectPanel.focus();
+    }
+  }
+
+  function closeProject() {
+    resetProjectMedia();
+    projectLightbox?.setAttribute("hidden", "");
+    document.body.classList.remove("has-lightbox");
+    if (previousFocus instanceof HTMLElement) {
+      previousFocus.focus();
+    }
+  }
+
+  function moveProject(direction: number) {
+    openProject(currentProjectIndex + direction);
+  }
+
+  projectTriggers.forEach((trigger, index) => {
+    trigger.addEventListener("click", () => openProject(index));
+  });
+
+  closeProjectButton?.addEventListener("click", closeProject);
+  prevProjectButton?.addEventListener("click", () => moveProject(-1));
+  nextProjectButton?.addEventListener("click", () => moveProject(1));
+
+  projectLightbox?.addEventListener("click", (event) => {
+    if (event.target === projectLightbox) {
+      closeProject();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (projectLightbox?.hasAttribute("hidden")) {
+      return;
+    }
+
+    if (event.key === "Escape") {
+      closeProject();
+    } else if (event.key === "ArrowLeft") {
+      moveProject(-1);
+    } else if (event.key === "ArrowRight") {
+      moveProject(1);
+    }
+  });
+</script>

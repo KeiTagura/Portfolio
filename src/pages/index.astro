@@ -1,0 +1,21 @@
+---
+import AboutSection from "@components/AboutSection.astro";
+import ContactSection from "@components/ContactSection.astro";
+import ExperienceSkills from "@components/ExperienceSkills.astro";
+import FeaturedProjects from "@components/FeaturedProjects.astro";
+import GalleryGrid from "@components/GalleryGrid.astro";
+import Hero from "@components/Hero.astro";
+import { site } from "@config/site";
+import BaseLayout from "@layouts/BaseLayout.astro";
+
+const meta = site.pages.home;
+---
+
+<BaseLayout title={meta.title} description={meta.description}>
+  <Hero />
+  <FeaturedProjects id="projects" variant="home" />
+  <GalleryGrid id="gallery" variant="home" />
+  <AboutSection id="about" variant="home" />
+  <ExperienceSkills id="experience" variant="home" />
+  <ContactSection id="contact" variant="home" />
+</BaseLayout>

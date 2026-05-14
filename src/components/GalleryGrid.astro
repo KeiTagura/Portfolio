@@ -1,0 +1,102 @@
+---
+import { getCollection } from "astro:content";
+import GalleryFilter from "@components/GalleryFilter.astro";
+import Lightbox from "@components/Lightbox.astro";
+import SectionHeader from "@components/SectionHeader.astro";
+import { site } from "@config/site";
+import { getUi } from "@data/ui";
+import { withBase } from "../utils/paths";
+
+interface Props {
+  id?: string;
+  showHeader?: boolean;
+  variant?: "home" | "page";
+}
+
+const { id, variant = "home" } = Astro.props;
+const showHeader = Astro.props.showHeader ?? variant === "home";
+const items = (await getCollection("gallery")).sort((a, b) => a.data.order - b.data.order);
+const visibleItems = variant === "home" ? items.slice(0, 6) : items;
+const ui = getUi();
+const masonryStyle = [
+  `--masonry-mobile: ${site.galleryMasonry.mobile}`,
+  `--masonry-tablet: ${site.galleryMasonry.tablet}`,
+  `--masonry-desktop: ${site.galleryMasonry.desktop}`,
+  `--masonry-wide: ${site.galleryMasonry.wide}`,
+].join("; ");
+---
+
+<section class:list={["page-section", "gallery-section", `section-${variant}`]} id={id}>
+  {
+    showHeader && (
+      <SectionHeader
+        eyebrow={ui.sections.gallery.eyebrow}
+        title={ui.sections.gallery.title}
+        description={ui.sections.gallery.compactIntro}
+        actionHref={withBase("/gallery")}
+        actionLabel={ui.sections.gallery.actionLabel}
+        variant="compact"
+      />
+    )
+  }
+  {variant === "page" && <GalleryFilter />}
+  <div class="gallery-grid" data-gallery-grid style={masonryStyle}>
+    {
+      visibleItems.map((item, index) => (
+        <article class="gallery-item" data-gallery-item data-tags={item.data.tags.join("|")}>
+          <button
+            type="button"
+            class="gallery-media"
+            data-lightbox-trigger
+            data-lightbox-index={index}
+            data-media-type={item.data.mediaType}
+            data-media-src={withBase(item.data.mediaSrc)}
+            data-title={item.data.title}
+            data-description={item.data.description}
+            data-alt={`${item.data.title} media preview`}
+            aria-label={`${ui.common.openMedia}: ${item.data.title}`}
+          >
+            <img src={withBase(item.data.thumbnail)} alt={`${item.data.title} thumbnail`} loading="lazy" />
+            {item.data.mediaType !== "image" && <span class:list={["media-indicator", `media-${item.data.mediaType}`]}>{item.data.mediaType}</span>}
+            {
+              ["localVideo", "youtube", "vimeo"].includes(item.data.mediaType) && (
+                <span class="play-indicator" aria-hidden="true"></span>
+              )
+            }
+          </button>
+          <div>
+            <span>{item.data.tags.join(" / ")}</span>
+            <h3>{item.data.title}</h3>
+            <p>{item.data.description}</p>
+          </div>
+        </article>
+      ))
+    }
+  </div>
+  <Lightbox />
+</section>
+
+<script>
+  const filterButtons = document.querySelectorAll("[data-gallery-filter]");
+  const galleryItems = document.querySelectorAll("[data-tags]");
+
+  function setFilter(category: string) {
+    filterButtons.forEach((button) => {
+      button.setAttribute(
+        "aria-pressed",
+        button.getAttribute("data-gallery-filter") === category ? "true" : "false",
+      );
+    });
+    galleryItems.forEach((item) => {
+      const itemTags = item.getAttribute("data-tags")?.split("|") ?? [];
+      const shouldShow = category === "All" || itemTags.includes(category);
+      item.toggleAttribute("hidden", !shouldShow);
+    });
+  }
+
+  filterButtons.forEach((button) => {
+    button.addEventListener("click", () => setFilter(button.getAttribute("data-gallery-filter") ?? "All"));
+  });
+
+  setFilter("All");
+</script>

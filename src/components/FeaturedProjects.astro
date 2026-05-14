@@ -1,0 +1,40 @@
+---
+import { getCollection } from "astro:content";
+import ProjectLightbox from "@components/ProjectLightbox.astro";
+import ProjectCard from "@components/ProjectCard.astro";
+import SectionHeader from "@components/SectionHeader.astro";
+import { getUi } from "@data/ui";
+import { withBase } from "../utils/paths";
+
+interface Props {
+  id?: string;
+  showHeader?: boolean;
+  variant?: "home" | "page";
+}
+
+const { id, variant = "home" } = Astro.props;
+const showHeader = Astro.props.showHeader ?? variant === "home";
+const allProjects = (await getCollection("projects")).sort((a, b) => a.data.order - b.data.order);
+const projects = variant === "home" ? allProjects.filter((project) => project.data.featured) : allProjects;
+const visibleProjects = variant === "home" ? projects.slice(0, 2) : projects;
+const ui = getUi();
+---
+
+<section class:list={["page-section", "featured-projects", `section-${variant}`]} id={id}>
+  {
+    showHeader && (
+      <SectionHeader
+        eyebrow={ui.sections.projects.eyebrow}
+        title={ui.sections.projects.title}
+        description={ui.sections.projects.compactIntro}
+        actionHref={withBase("/projects")}
+        actionLabel={ui.sections.projects.actionLabel}
+        variant="compact"
+      />
+    )
+  }
+  <div class="project-grid">
+    {visibleProjects.map((project, index) => <ProjectCard project={project} variant={variant} index={index} />)}
+  </div>
+  <ProjectLightbox projects={visibleProjects} />
+</section>

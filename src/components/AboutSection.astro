@@ -1,0 +1,57 @@
+---
+import { getCollection, render } from "astro:content";
+import SectionHeader from "@components/SectionHeader.astro";
+import { defaultLocale } from "@config/i18n";
+import { getUi } from "@data/ui";
+import { withBase } from "../utils/paths";
+
+interface Props {
+  id?: string;
+  showHeader?: boolean;
+  variant?: "home" | "page";
+}
+
+const { id, variant = "home" } = Astro.props;
+const showHeader = Astro.props.showHeader ?? variant === "home";
+const aboutEntries = await getCollection("about");
+const about =
+  aboutEntries.find((entry) => entry.id.replace(/\.(md|mdx)$/, "") === defaultLocale) ?? aboutEntries[0];
+const { Content } = await render(about);
+const ui = getUi();
+---
+
+<section class:list={["page-section", "about-section", `section-${variant}`]} id={id}>
+  {
+    showHeader && (
+      <SectionHeader
+        eyebrow={ui.sections.about.eyebrow}
+        title={ui.sections.about.title}
+        description={ui.sections.about.compactIntro}
+        actionHref={withBase("/about")}
+        actionLabel={ui.sections.about.actionLabel}
+        variant="compact"
+      />
+    )
+  }
+  <div class="about-layout">
+    <img class="portrait" src={withBase(about.data.portrait)} alt={`${about.data.title} portrait placeholder`} loading="lazy" />
+    <div class="about-copy">
+      <p class="eyebrow">{about.data.role}</p>
+      <h3>{about.data.title}</h3>
+      <Content />
+      <dl class="profile-facts">
+        <div>
+          <dt>Location</dt>
+          <dd>{about.data.location}</dd>
+        </div>
+        <div>
+          <dt>Availability</dt>
+          <dd>{about.data.availability}</dd>
+        </div>
+      </dl>
+      <div class="tag-list">
+        {about.data.focus.map((item) => <span>{item}</span>)}
+      </div>
+    </div>
+  </div>
+</section>

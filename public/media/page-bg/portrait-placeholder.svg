@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 860" role="img" aria-label="Portrait placeholder">
+  <rect width="700" height="860" fill="#11141c"/>
+  <path d="M110 730 C190 610 250 580 350 580 S510 610 590 730" fill="#1d2530"/>
+  <circle cx="350" cy="330" r="150" fill="#222e3e"/>
+  <path d="M225 330 C250 215 450 215 475 330 C440 265 260 265 225 330Z" fill="#57d5ff" opacity=".55"/>
+  <path d="M190 730 H510" stroke="#ffcf5a" stroke-width="12"/>
+  <path d="M120 120 H580 V740 H120Z" fill="none" stroke="#ffffff" stroke-opacity=".12" stroke-width="2"/>
+</svg>
