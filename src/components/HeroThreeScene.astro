@@ -1,0 +1,47 @@
+---
+import { site } from "@config/site";
+import { withBase } from "../utils/paths";
+
+const visual = site.heroVisual;
+const sceneId = "hero-three-scene";
+const fallbackImage = withBase(visual.fallbackImage);
+const modelUrl = withBase(visual.modelUrl);
+---
+
+<div
+  class:list={["hero-visual", { "hero-visual-disabled": !visual.enabled }]}
+  aria-hidden="true"
+  data-hero-visual
+  style={`--hero-fallback-image: url("${fallbackImage}")`}
+>
+  <div class="hero-visual-fallback"></div>
+  {
+    visual.enabled && (
+      <div
+        id={sceneId}
+        class="hero-three-scene"
+        data-hero-three-scene
+        data-mode={visual.mode}
+        data-model-url={modelUrl}
+        data-ascii-side={visual.asciiSide}
+        data-split-position={visual.splitPosition}
+        data-ascii-resolution={visual.asciiResolution}
+        data-pointer-parallax={String(visual.enablePointerParallax)}
+        data-max-pixel-ratio={visual.maxPixelRatio}
+        data-disable-on-mobile={String(visual.disableOnMobile)}
+      />
+    )
+  }
+</div>
+
+{
+  visual.enabled && (
+    <script>
+      import { destroyHeroThreeScenes, initHeroThreeScenes } from "../scripts/hero-three-scene";
+
+      document.addEventListener("astro:page-load", initHeroThreeScenes);
+      document.addEventListener("astro:before-swap", destroyHeroThreeScenes);
+      initHeroThreeScenes();
+    </script>
+  )
+}

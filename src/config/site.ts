@@ -10,6 +10,18 @@ export const site = {
   locale: "en_US",
   ogImage: "/og-image.jpg",
   favicon: "/favicon.svg",
+  heroVisual: {
+    enabled: true,
+    mode: "three-ascii-split",
+    modelUrl: "/media/hero/hero-model.glb",
+    fallbackImage: "/media/hero/hero-fallback.webp",
+    asciiSide: "right",
+    splitPosition: 0.5,
+    asciiResolution: 96,
+    enablePointerParallax: true,
+    maxPixelRatio: 1.5,
+    disableOnMobile: false,
+  },
   pages: {
     home: {
       path: "/",

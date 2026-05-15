@@ -1,11 +1,12 @@
 ---
+import HeroThreeScene from "@components/HeroThreeScene.astro";
 import { links } from "@data/links";
 import { withBase } from "../utils/paths";
 ---
 
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero-media" aria-hidden="true">
-    <img src={withBase("/media/page-bg/hero-showcase.svg")} alt="" loading="eager" />
+    <HeroThreeScene />
   </div>
   <div class="hero-content">
     <p class="eyebrow">Game Developer / Technical Artist</p>

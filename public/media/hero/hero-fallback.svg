@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" role="img" aria-label="Abstract code as art hero fallback">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#07131c"/>
+      <stop offset=".54" stop-color="#121824"/>
+      <stop offset="1" stop-color="#2b1525"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" x2="1">
+      <stop offset="0" stop-color="#57d5ff"/>
+      <stop offset="1" stop-color="#8effd2"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" x2="1">
+      <stop offset="0" stop-color="#ffcf5a"/>
+      <stop offset="1" stop-color="#ff6f91"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#bg)"/>
+  <g opacity=".13" stroke="#fff" stroke-width="1">
+    <path d="M0 760 C260 620 360 860 600 720 S1000 520 1600 700" fill="none"/>
+    <path d="M0 820 C240 680 420 900 680 760 S1140 560 1600 760" fill="none"/>
+    <path d="M0 0h1600M0 125h1600M0 250h1600M0 375h1600M0 500h1600M0 625h1600M0 750h1600M0 875h1600"/>
+    <path d="M125 0v1000M250 0v1000M375 0v1000M500 0v1000M625 0v1000M750 0v1000M875 0v1000M1000 0v1000M1125 0v1000M1250 0v1000M1375 0v1000"/>
+  </g>
+  <g transform="translate(860 235)">
+    <path d="M0 380 210 10 430 380Z" fill="#111a28" stroke="#57d5ff" stroke-width="4"/>
+    <path d="M112 380 210 120 316 380Z" fill="#1a2a3d" stroke="#ffcf5a" stroke-width="3"/>
+    <circle cx="210" cy="122" r="42" fill="url(#cyan)"/>
+    <path d="M70 312h292" stroke="#57d5ff" stroke-width="4"/>
+    <path d="M126 238h188" stroke="#ff6f91" stroke-width="4"/>
+  </g>
+  <g transform="translate(1040 650)" font-family="monospace" font-size="34" font-weight="700">
+    <text x="0" y="0" fill="#ffcf5a">{ shader }</text>
+    <text x="0" y="52" fill="#57d5ff">vec3 art = code;</text>
+    <text x="0" y="104" fill="#ffffff" opacity=".48">render(work);</text>
+  </g>
+  <g transform="translate(560 590)" fill="none" stroke-width="9">
+    <circle cx="0" cy="0" r="74" stroke="#57d5ff"/>
+    <circle cx="0" cy="0" r="124" stroke="#ffcf5a" opacity=".68"/>
+    <path d="M-210 0h420M0-210v420" stroke="#fff" opacity=".16"/>
+  </g>
+</svg>
