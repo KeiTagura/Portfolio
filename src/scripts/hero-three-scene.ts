@@ -9,8 +9,12 @@ type HeroThreeSettings = {
   modelUrl: string;
   asciiSide: "left" | "right";
   splitPosition: number;
+  splitAngle: number;
+  splitSoftness: number;
+  showSplitLine: boolean;
   asciiResolution: number;
   enablePointerParallax: boolean;
+  enableOrbitControls: boolean;
   maxPixelRatio: number;
   disableOnMobile: boolean;
 };
@@ -22,14 +26,22 @@ function parseNumber(value: string | null, fallback: number) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 function readSettings(container: HTMLElement): HeroThreeSettings {
   return {
     mode: container.dataset.mode ?? "three-ascii-split",
     modelUrl: container.dataset.modelUrl ?? "",
     asciiSide: container.dataset.asciiSide === "left" ? "left" : "right",
-    splitPosition: parseNumber(container.dataset.splitPosition ?? null, 0.5),
+    splitPosition: clampNumber(parseNumber(container.dataset.splitPosition ?? null, 0.5), 0, 1),
+    splitAngle: parseNumber(container.dataset.splitAngle ?? null, 0),
+    splitSoftness: clampNumber(parseNumber(container.dataset.splitSoftness ?? null, 0.03), 0, 0.25),
+    showSplitLine: container.dataset.showSplitLine !== "false",
     asciiResolution: parseNumber(container.dataset.asciiResolution ?? null, 96),
     enablePointerParallax: container.dataset.pointerParallax === "true",
+    enableOrbitControls: container.dataset.orbitControls === "true",
     maxPixelRatio: parseNumber(container.dataset.maxPixelRatio ?? null, 1.5),
     disableOnMobile: container.dataset.disableOnMobile === "true",
   };
@@ -233,6 +245,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   let paused = document.visibilityState === "hidden";
   const asciiUpdateInterval = reduceMotion ? Infinity : isSmallScreen ? 1000 / 8 : 1000 / 14;
   const maxAsciiColumns = isSmallScreen ? 42 : Math.max(48, Math.min(96, settings.asciiResolution));
+  const splitAngleRadians = THREE.MathUtils.degToRad(settings.splitAngle);
 
   function setAsciiCanvasSize(nextWidth: number, nextHeight: number) {
     const pixelRatio = Math.min(window.devicePixelRatio || 1, settings.maxPixelRatio);
@@ -247,15 +260,26 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     const drawingWidth = renderer.domElement.width;
     const drawingHeight = renderer.domElement.height;
     const split = Math.floor(drawingWidth * settings.splitPosition);
-    const normalX = settings.asciiSide === "right" ? 0 : split;
-    const normalWidth = settings.asciiSide === "right" ? split : drawingWidth - split;
+    const softness =
+      split <= 0 || split >= drawingWidth ? 0 : Math.floor(drawingWidth * settings.splitSoftness);
+    const normalStart =
+      settings.asciiSide === "right"
+        ? 0
+        : clampNumber(split - softness, 0, drawingWidth);
+    const normalEnd =
+      settings.asciiSide === "right"
+        ? clampNumber(split + softness, 0, drawingWidth)
+        : drawingWidth;
+    const normalWidth = normalEnd - normalStart;
 
     renderer.setScissorTest(false);
     renderer.clear();
     renderer.setViewport(0, 0, drawingWidth, drawingHeight);
-    renderer.setScissor(normalX, 0, Math.max(1, normalWidth), drawingHeight);
-    renderer.setScissorTest(true);
-    renderer.render(scene, camera);
+    if (normalWidth > 0) {
+      renderer.setScissor(normalStart, 0, normalWidth, drawingHeight);
+      renderer.setScissorTest(true);
+      renderer.render(scene, camera);
+    }
     renderer.setScissorTest(false);
   }
 
@@ -382,10 +406,21 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     const viewportWidth = container.clientWidth;
     const viewportHeight = container.clientHeight;
     const split = viewportWidth * settings.splitPosition;
-    const asciiX = settings.asciiSide === "right" ? split : 0;
-    const asciiWidth = settings.asciiSide === "right" ? viewportWidth - split : split;
+    const softness = split <= 0 || split >= viewportWidth ? 0 : viewportWidth * settings.splitSoftness;
+    const asciiX =
+      settings.asciiSide === "right"
+        ? clampNumber(split - softness, 0, viewportWidth)
+        : 0;
+    const asciiEnd =
+      settings.asciiSide === "right"
+        ? viewportWidth
+        : clampNumber(split + softness, 0, viewportWidth);
+    const asciiWidth = asciiEnd - asciiX;
+    const asciiFadeStart = settings.asciiSide === "right" ? split - softness : split + softness;
+    const asciiFadeEnd = split;
 
     if (asciiWidth <= 0) {
+      asciiContext.clearRect(0, 0, viewportWidth, viewportHeight);
       return;
     }
 
@@ -446,8 +481,15 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
 
     asciiContext.clearRect(0, 0, viewportWidth, viewportHeight);
     const gradient = asciiContext.createLinearGradient(asciiX, 0, asciiX + asciiWidth, 0);
-    gradient.addColorStop(0, "rgba(8, 9, 13, 0.76)");
-    gradient.addColorStop(settings.asciiSide === "right" ? 1 : 0.2, "rgba(8, 9, 13, 0.42)");
+    if (settings.asciiSide === "right") {
+      gradient.addColorStop(0, "rgba(8, 9, 13, 0.1)");
+      gradient.addColorStop(Math.min(1, softness > 0 ? softness / asciiWidth : 0), "rgba(8, 9, 13, 0.76)");
+      gradient.addColorStop(1, "rgba(8, 9, 13, 0.42)");
+    } else {
+      gradient.addColorStop(0, "rgba(8, 9, 13, 0.42)");
+      gradient.addColorStop(Math.max(0, 1 - (softness > 0 ? softness / asciiWidth : 0)), "rgba(8, 9, 13, 0.76)");
+      gradient.addColorStop(1, "rgba(8, 9, 13, 0.1)");
+    }
     asciiContext.fillStyle = gradient;
     asciiContext.fillRect(asciiX, 0, asciiWidth, viewportHeight);
 
@@ -472,17 +514,39 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
         const level = Math.min(1, intensity[index]);
         asciiContext.fillStyle =
           level > 1.1 ? "rgba(255, 207, 90, 0.94)" : level > 0.64 ? "rgba(87, 213, 255, 0.86)" : "rgba(191, 239, 255, 0.58)";
-        asciiContext.fillText(character, asciiX + column * cellWidth + cellWidth * 0.5, row * cellHeight + cellHeight * 0.55);
+        const characterX = asciiX + column * cellWidth + cellWidth * 0.5;
+        let fade = 1;
+        if (softness > 0) {
+          if (settings.asciiSide === "right" && characterX < split) {
+            fade = clampNumber((characterX - asciiFadeStart) / Math.max(1, asciiFadeEnd - asciiFadeStart), 0, 1);
+          }
+
+          if (settings.asciiSide === "left" && characterX > split) {
+            fade = clampNumber((asciiFadeStart - characterX) / Math.max(1, asciiFadeStart - asciiFadeEnd), 0, 1);
+          }
+        }
+
+        asciiContext.globalAlpha = fade;
+        asciiContext.fillText(character, characterX, row * cellHeight + cellHeight * 0.55);
       }
     }
 
+    asciiContext.globalAlpha = 1;
     asciiContext.restore();
-    const splitGradient = asciiContext.createLinearGradient(split - 10, 0, split + 10, 0);
-    splitGradient.addColorStop(0, "rgba(87, 213, 255, 0)");
-    splitGradient.addColorStop(0.5, "rgba(255, 207, 90, 0.62)");
-    splitGradient.addColorStop(1, "rgba(87, 213, 255, 0)");
-    asciiContext.fillStyle = splitGradient;
-    asciiContext.fillRect(split - 10, viewportHeight * 0.11, 20, viewportHeight * 0.76);
+
+    if (settings.showSplitLine && split > 0 && split < viewportWidth) {
+      const splitLineWidth = Math.max(10, softness * 0.6, 16);
+      const splitGradient = asciiContext.createLinearGradient(split - splitLineWidth, 0, split + splitLineWidth, 0);
+      splitGradient.addColorStop(0, "rgba(87, 213, 255, 0)");
+      splitGradient.addColorStop(0.5, "rgba(255, 207, 90, 0.62)");
+      splitGradient.addColorStop(1, "rgba(87, 213, 255, 0)");
+      asciiContext.save();
+      asciiContext.translate(split, viewportHeight * 0.5);
+      asciiContext.rotate(splitAngleRadians);
+      asciiContext.fillStyle = splitGradient;
+      asciiContext.fillRect(-splitLineWidth, viewportHeight * -0.38, splitLineWidth * 2, viewportHeight * 0.76);
+      asciiContext.restore();
+    }
   }
 
   const resizeObserver = new ResizeObserver((entries) => {

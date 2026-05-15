@@ -237,7 +237,14 @@ main {
   inset: 0;
   z-index: 3;
   background:
-    linear-gradient(90deg, rgba(87, 213, 255, 0.1), transparent 38%, rgba(255, 207, 90, 0.08) 52%, transparent 72%),
+    linear-gradient(
+      90deg,
+      transparent calc(var(--hero-split-position, 50%) - var(--hero-split-softness, 3%) - 4%),
+      rgba(87, 213, 255, 0.09) calc(var(--hero-split-position, 50%) - var(--hero-split-softness, 3%)),
+      var(--hero-split-line-color, rgba(255, 207, 90, 0.22)) var(--hero-split-position, 50%),
+      rgba(87, 213, 255, 0.07) calc(var(--hero-split-position, 50%) + var(--hero-split-softness, 3%)),
+      transparent calc(var(--hero-split-position, 50%) + var(--hero-split-softness, 3%) + 8%)
+    ),
     radial-gradient(circle at 72% 42%, rgba(87, 213, 255, 0.13), transparent 26%);
   content: "";
   pointer-events: none;
