@@ -6,6 +6,12 @@ type HeroThreeController = {
 };
 
 type AsciiSamplePattern = "center" | "grid" | "circle6";
+type AsciiShapeVectorMode = "2d" | "6d";
+
+type AsciiCharacterVector = {
+  character: string;
+  vector: number[];
+};
 
 type HeroThreeSettings = {
   mode: string;
@@ -32,7 +38,10 @@ type HeroThreeSettings = {
     fontSize: number;
     lineHeight: number;
     useShapeAwareLookup: boolean;
+    shapeVectorMode: AsciiShapeVectorMode;
     useCachedLookup: boolean;
+    lookupQuantization: number;
+    maxCacheEntries: number;
     disableOnMobile: boolean;
   };
   enableOrbitControls: boolean;
@@ -80,6 +89,10 @@ function readSamplePattern(value: string | undefined): AsciiSamplePattern {
   return value === "center" || value === "circle6" || value === "grid" ? value : "grid";
 }
 
+function readShapeVectorMode(value: string | undefined): AsciiShapeVectorMode {
+  return value === "2d" || value === "6d" ? value : "6d";
+}
+
 function normalizeCharset(value: string | undefined) {
   const characters = Array.from(value && value.length > 0 ? value : " .:-=+*#%@");
   return characters.length > 1 ? characters : [" ", characters[0] ?? "@"];
@@ -113,7 +126,10 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
       fontSize: clampNumber(parseNumber(container.dataset.asciiFontSize ?? null, 10), 6, 24),
       lineHeight: clampNumber(parseNumber(container.dataset.asciiLineHeight ?? null, 10), 6, 32),
       useShapeAwareLookup: container.dataset.asciiShapeAwareLookup === "true",
+      shapeVectorMode: readShapeVectorMode(container.dataset.asciiShapeVectorMode),
       useCachedLookup: container.dataset.asciiCachedLookup !== "false",
+      lookupQuantization: clampNumber(parseInteger(container.dataset.asciiLookupQuantization ?? null, 8), 2, 32),
+      maxCacheEntries: clampNumber(parseInteger(container.dataset.asciiMaxCacheEntries ?? null, 10000), 0, 50000),
       disableOnMobile: container.dataset.asciiDisableOnMobile === "true",
     },
     enableOrbitControls: container.dataset.orbitControls === "true",
@@ -177,6 +193,139 @@ function getAsciiSampleOffsets(pattern: AsciiSamplePattern, sampleCount: number)
     { x: 0.36, y: 0 },
     { x: 0, y: -0.36 },
   ].slice(0, sampleCount);
+}
+
+function getShapeVectorSize(mode: AsciiShapeVectorMode) {
+  return mode === "2d" ? 2 : 6;
+}
+
+function getShapeVectorIndex(mode: AsciiShapeVectorMode, localX: number, localY: number) {
+  if (mode === "2d") {
+    return localY < 0.5 ? 0 : 1;
+  }
+
+  const column = localX < 0.5 ? 0 : 1;
+  const row = localY < 1 / 3 ? 0 : localY < 2 / 3 ? 1 : 2;
+  return row * 2 + column;
+}
+
+function normalizeShapeVector(vector: number[]) {
+  const maxValue = Math.max(...vector);
+  if (maxValue <= 0) {
+    return vector.map(() => 0);
+  }
+
+  return vector.map((value) => value / maxValue);
+}
+
+function applyShapeVectorContrast(vector: number[], contrast: number) {
+  const maxValue = Math.max(...vector);
+  if (maxValue <= 0 || contrast === 1) {
+    return vector;
+  }
+
+  // Inspired by the article's contrast enhancement: normalize the vector,
+  // apply an exponent, then map back to the original range. This sharpens
+  // boundaries without changing the overall cell brightness as aggressively.
+  return vector.map((value) => Math.pow(value / maxValue, contrast) * maxValue);
+}
+
+function createShapeVectorLookup(
+  characters: string[],
+  mode: AsciiShapeVectorMode,
+  fontSize: number,
+): AsciiCharacterVector[] {
+  // This is intentionally a small CPU-side approximation of shape-aware ASCII:
+  // character vectors are generated once, then animation frames compare against
+  // cached, quantized cell vectors. It avoids the article's heavier brute-force
+  // or GPU paths while keeping edge cells more directional than brightness only.
+  const vectorSize = getShapeVectorSize(mode);
+  const canvas = document.createElement("canvas");
+  const width = 32;
+  const height = 48;
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+
+  if (!context) {
+    return [];
+  }
+
+  const vectors = characters.map((character) => {
+    context.clearRect(0, 0, width, height);
+    context.fillStyle = "#fff";
+    context.font = `${Math.round(fontSize * 2.6)}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(character, width * 0.5, height * 0.52);
+
+    const pixels = context.getImageData(0, 0, width, height).data;
+    const vector = Array.from({ length: vectorSize }, () => 0);
+    const counts = Array.from({ length: vectorSize }, () => 0);
+
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const localX = (x + 0.5) / width;
+        const localY = (y + 0.5) / height;
+        const vectorIndex = getShapeVectorIndex(mode, localX, localY);
+        vector[vectorIndex] += pixels[(y * width + x) * 4 + 3] / 255;
+        counts[vectorIndex] += 1;
+      }
+    }
+
+    return {
+      character,
+      vector: normalizeShapeVector(vector.map((value, index) => value / Math.max(1, counts[index]))),
+    };
+  });
+
+  return vectors;
+}
+
+function findShapeAwareCharacter(
+  inputVector: number[],
+  characterVectors: AsciiCharacterVector[],
+  cache: Map<string, string>,
+  useCache: boolean,
+  quantization: number,
+  maxCacheEntries: number,
+) {
+  if (characterVectors.length === 0) {
+    return "";
+  }
+
+  const key = inputVector.map((value) => Math.round(clampNumber(value, 0, 1) * quantization)).join(",");
+  if (useCache) {
+    const cached = cache.get(key);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  let bestCharacter = characterVectors[0].character;
+  let bestDistance = Infinity;
+
+  for (const candidate of characterVectors) {
+    let distance = 0;
+    for (let index = 0; index < inputVector.length; index += 1) {
+      const delta = inputVector[index] - candidate.vector[index];
+      distance += delta * delta;
+    }
+
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestCharacter = candidate.character;
+    }
+  }
+
+  if (useCache && maxCacheEntries > 0) {
+    if (cache.size >= maxCacheEntries) {
+      cache.clear();
+    }
+    cache.set(key, bestCharacter);
+  }
+
+  return bestCharacter;
 }
 
 async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeController | null> {
@@ -400,6 +549,14 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   const splitAngleRadians = THREE.MathUtils.degToRad(settings.splitAngle);
   const asciiCharacters = normalizeCharset(settings.ascii.charset);
   const asciiSampleOffsets = getAsciiSampleOffsets(settings.ascii.samplePattern, settings.ascii.sampleCount);
+  const shapeVectorSize = getShapeVectorSize(settings.ascii.shapeVectorMode);
+  const shapeCharacterVectors = settings.ascii.useShapeAwareLookup
+    ? createShapeVectorLookup(asciiCharacters, settings.ascii.shapeVectorMode, settings.ascii.fontSize)
+    : [];
+  const shapeLookupCache = new Map<string, string>();
+  let shapeAwareRuntimeEnabled = settings.ascii.useShapeAwareLookup && shapeCharacterVectors.length > 0 && !isSmallScreen;
+  let slowShapeAwareFrames = 0;
+  container.dataset.asciiShapeRuntime = shapeAwareRuntimeEnabled ? "shape-aware" : "brightness";
 
   if (OrbitControlsClass) {
     controls = new OrbitControlsClass(camera, renderer.domElement);
@@ -525,9 +682,42 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     return strongestDelta;
   }
 
+  function addShapeSample(
+    shapeVectors: number[],
+    columns: number,
+    column: number,
+    row: number,
+    localX: number,
+    localY: number,
+    weight: number,
+  ) {
+    if (!shapeAwareRuntimeEnabled) {
+      return;
+    }
+
+    const cellIndex = row * columns + column;
+    const vectorIndex = getShapeVectorIndex(
+      settings.ascii.shapeVectorMode,
+      clampNumber(localX, 0, 0.999),
+      clampNumber(localY, 0, 0.999),
+    );
+    shapeVectors[cellIndex * shapeVectorSize + vectorIndex] += weight;
+  }
+
+  function getCellShapeVector(shapeVectors: number[], cellIndex: number, intensityValue: number) {
+    const start = cellIndex * shapeVectorSize;
+    const vector = Array.from({ length: shapeVectorSize }, (_, index) => shapeVectors[start + index] ?? 0);
+    const normalized = normalizeShapeVector(vector);
+    const contrasted = applyShapeVectorContrast(normalized, Math.max(1, settings.ascii.contrast));
+    const tunedLevel = tuneAsciiValue(intensityValue);
+
+    return contrasted.map((value) => clampNumber(value * Math.max(0.35, tunedLevel), 0, 1));
+  }
+
   function drawAsciiLine(
     cells: string[],
     intensity: number[],
+    shapeVectors: number[],
     columns: number,
     rows: number,
     cellWidth: number,
@@ -563,6 +753,15 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
         const index = row * columns + column;
         intensity[index] += sampleWeight;
         cells[index] = intensity[index] > 1.4 ? "#" : character;
+        addShapeSample(
+          shapeVectors,
+          columns,
+          column,
+          row,
+          (x + offset.x * cellWidth) / cellWidth - column,
+          (y + offset.y * cellHeight) / cellHeight - row,
+          sampleWeight,
+        );
       }
     }
   }
@@ -570,6 +769,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   function drawAsciiPoint(
     cells: string[],
     intensity: number[],
+    shapeVectors: number[],
     columns: number,
     rows: number,
     cellWidth: number,
@@ -594,6 +794,15 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       intensity[index] += sampleWeight;
       const level = intensity[index];
       cells[index] = level > 1.4 ? "@" : level > 0.9 ? "*" : level > 0.55 ? "+" : ".";
+      addShapeSample(
+        shapeVectors,
+        columns,
+        column,
+        row,
+        (localX + offset.x * cellWidth) / cellWidth - column,
+        (y + offset.y * cellHeight) / cellHeight - row,
+        sampleWeight,
+      );
     }
   }
 
@@ -602,6 +811,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     object: Object3D,
     cells: string[],
     intensity: number[],
+    shapeVectors: number[],
     columns: number,
     rows: number,
     cellWidth: number,
@@ -626,7 +836,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
         continue;
       }
 
-      drawAsciiLine(cells, intensity, columns, rows, cellWidth, cellHeight, a.x, a.y, b.x, b.y, xOffset);
+      drawAsciiLine(cells, intensity, shapeVectors, columns, rows, cellWidth, cellHeight, a.x, a.y, b.x, b.y, xOffset);
     }
   }
 
@@ -673,12 +883,17 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     const rows = Math.max(1, Math.floor(viewportHeight / cellHeight));
     const cells = Array.from({ length: columns * rows }, () => " ");
     const intensity = Array.from({ length: columns * rows }, () => 0);
+    const shapeVectors = shapeAwareRuntimeEnabled
+      ? Array.from({ length: columns * rows * shapeVectorSize }, () => 0)
+      : [];
+    const shapeFrameStart = performance.now();
 
     drawEdgesAsAscii(
       coreEdgesGeometry,
       core,
       cells,
       intensity,
+      shapeVectors,
       columns,
       rows,
       cellWidth,
@@ -692,6 +907,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       wireShell,
       cells,
       intensity,
+      shapeVectors,
       columns,
       rows,
       cellWidth,
@@ -707,7 +923,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       point.setFromMatrixPosition(shard.matrixWorld);
       const projected = projectWorldToScreen(point, viewportWidth, viewportHeight);
       if (projected.z >= -1 && projected.z <= 1) {
-        drawAsciiPoint(cells, intensity, columns, rows, cellWidth, cellHeight, projected.x, projected.y, asciiX, 0.62);
+        drawAsciiPoint(cells, intensity, shapeVectors, columns, rows, cellWidth, cellHeight, projected.x, projected.y, asciiX, 0.62);
       }
     });
 
@@ -717,7 +933,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       point.fromBufferAttribute(particlePositionsAttribute, index).applyMatrix4(particles.matrixWorld);
       const projected = projectWorldToScreen(point, viewportWidth, viewportHeight);
       if (projected.z >= -1 && projected.z <= 1) {
-        drawAsciiPoint(cells, intensity, columns, rows, cellWidth, cellHeight, projected.x, projected.y, asciiX, 0.28);
+        drawAsciiPoint(cells, intensity, shapeVectors, columns, rows, cellWidth, cellHeight, projected.x, projected.y, asciiX, 0.28);
       }
     }
 
@@ -761,7 +977,17 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
         }
 
         const tunedLevel = tuneAsciiValue(level);
-        const mappedCharacter = settings.ascii.useShapeAwareLookup && isEdge ? character : getCharacterFromAsciiValue(tunedLevel);
+        const mappedCharacter =
+          shapeAwareRuntimeEnabled && isEdge
+            ? findShapeAwareCharacter(
+                getCellShapeVector(shapeVectors, index, level),
+                shapeCharacterVectors,
+                shapeLookupCache,
+                settings.ascii.useCachedLookup,
+                settings.ascii.lookupQuantization,
+                settings.ascii.maxCacheEntries,
+              ) || character
+            : getCharacterFromAsciiValue(tunedLevel);
         asciiContext.fillStyle =
           tunedLevel > 0.72
             ? "rgba(255, 207, 90, 0.94)"
@@ -787,6 +1013,18 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
 
     asciiContext.globalAlpha = 1;
     asciiContext.restore();
+
+    if (shapeAwareRuntimeEnabled && performance.now() - shapeFrameStart > 14) {
+      slowShapeAwareFrames += 1;
+      if (slowShapeAwareFrames >= 2) {
+        shapeAwareRuntimeEnabled = false;
+        shapeLookupCache.clear();
+        container.dataset.asciiShapeRuntime = "fallback-brightness";
+      }
+    } else if (shapeAwareRuntimeEnabled) {
+      slowShapeAwareFrames = 0;
+      container.dataset.asciiShapeRuntime = "shape-aware";
+    }
 
     if (settings.showSplitLine && split > 0 && split < viewportWidth) {
       const splitLineWidth = Math.max(10, softness * 0.6, 16);
