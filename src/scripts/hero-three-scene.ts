@@ -13,8 +13,16 @@ type AsciiCharacterVector = {
   vector: number[];
 };
 
+type HeroModelSource = "procedural" | "url";
+
+type AsciiEdgeSource = {
+  geometry: BufferGeometry;
+  object: Object3D;
+};
+
 type HeroThreeSettings = {
   mode: string;
+  modelSource: HeroModelSource;
   modelUrl: string;
   asciiSide: "left" | "right";
   splitPosition: number;
@@ -65,6 +73,7 @@ type HeroThreeSettings = {
 };
 
 const activeScenes = new WeakMap<HTMLElement, HeroThreeController>();
+const pendingScenes = new WeakSet<HTMLElement>();
 
 function parseNumber(value: string | null, fallback: number) {
   const parsed = Number(value);
@@ -93,6 +102,10 @@ function readShapeVectorMode(value: string | undefined): AsciiShapeVectorMode {
   return value === "2d" || value === "6d" ? value : "6d";
 }
 
+function readModelSource(value: string | undefined): HeroModelSource {
+  return value === "url" ? "url" : "procedural";
+}
+
 function normalizeCharset(value: string | undefined) {
   const characters = Array.from(value && value.length > 0 ? value : " .:-=+*#%@");
   return characters.length > 1 ? characters : [" ", characters[0] ?? "@"];
@@ -105,6 +118,7 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
 
   return {
     mode: container.dataset.mode ?? "three-ascii-split",
+    modelSource: readModelSource(container.dataset.modelSource),
     modelUrl: container.dataset.modelUrl ?? "",
     asciiSide: container.dataset.asciiSide === "left" ? "left" : "right",
     splitPosition: clampNumber(parseNumber(container.dataset.splitPosition ?? null, 0.5), 0, 1),
@@ -330,6 +344,23 @@ function findShapeAwareCharacter(
   return bestCharacter;
 }
 
+function disposeLoadedObject(object: Object3D) {
+  object.traverse((child) => {
+    const mesh = child as Mesh;
+    if (!mesh.isMesh) {
+      return;
+    }
+
+    mesh.geometry?.dispose();
+    const material = mesh.material;
+    if (Array.isArray(material)) {
+      material.forEach((item) => item.dispose());
+    } else {
+      material?.dispose();
+    }
+  });
+}
+
 async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeController | null> {
   const settings = readSettings(container);
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -346,6 +377,10 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   const OrbitControlsClass = orbitEnabled
     ? (await import("three/addons/controls/OrbitControls.js")).OrbitControls
     : null;
+  const GLTFLoaderClass =
+    settings.modelSource === "url" && settings.modelUrl
+      ? (await import("three/addons/loaders/GLTFLoader.js")).GLTFLoader
+      : null;
   const bounds = container.getBoundingClientRect();
   const width = Math.max(1, Math.floor(bounds.width));
   const height = Math.max(1, Math.floor(bounds.height));
@@ -377,6 +412,9 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   const root = new THREE.Group();
   root.position.set(1.35, 0.05, 0);
   scene.add(root);
+  const proceduralGroup = new THREE.Group();
+  proceduralGroup.name = "Hero procedural fallback";
+  root.add(proceduralGroup);
 
   let controls: OrbitControls | null = null;
   let resumeAutoRotateTimer = 0;
@@ -470,14 +508,14 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   const shellEdgesGeometry = new THREE.EdgesGeometry(shellGeometry);
 
   const core = new THREE.Mesh(coreGeometry, coreMaterial);
-  root.add(core);
+  proceduralGroup.add(core);
 
   const innerCore = new THREE.Mesh(innerGeometry, innerMaterial);
   innerCore.position.set(0.06, 0.02, 0.08);
-  root.add(innerCore);
+  proceduralGroup.add(innerCore);
 
   const wireShell = new THREE.Mesh(shellGeometry, wireMaterial);
-  root.add(wireShell);
+  proceduralGroup.add(wireShell);
 
   const shards: Mesh[] = [];
   for (let index = 0; index < 20; index += 1) {
@@ -487,7 +525,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     shard.position.set(Math.cos(angle) * radius, Math.sin(angle * 1.5) * 0.72, Math.sin(angle) * 0.9);
     shard.rotation.set(angle * 0.7, angle * 0.35, angle);
     shards.push(shard);
-    root.add(shard);
+    proceduralGroup.add(shard);
   }
 
   const gridGeometry = new THREE.BufferGeometry();
@@ -502,7 +540,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   gridGeometry.setAttribute("position", new THREE.Float32BufferAttribute(gridPoints, 3));
   const technicalGrid = new THREE.LineSegments(gridGeometry, gridMaterial);
   technicalGrid.position.set(0, 0, -0.2);
-  root.add(technicalGrid);
+  proceduralGroup.add(technicalGrid);
 
   const particleGeometry = new THREE.BufferGeometry();
   const particlePositions: number[] = [];
@@ -517,7 +555,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   }
   particleGeometry.setAttribute("position", new THREE.Float32BufferAttribute(particlePositions, 3));
   const particles: Points = new THREE.Points(particleGeometry, particleMaterial);
-  root.add(particles);
+  proceduralGroup.add(particles);
 
   const ambient = new THREE.AmbientLight(0x9fb8c8, 0.95);
   const key = new THREE.DirectionalLight(0x57d5ff, 2.25);
@@ -544,6 +582,11 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     gridMaterial,
     particleMaterial,
   ];
+  let asciiEdgeSources: AsciiEdgeSource[] = [
+    { geometry: coreEdgesGeometry, object: core },
+    { geometry: shellEdgesGeometry, object: wireShell },
+  ];
+  let loadedModel: Object3D | null = null;
 
   let frameId = 0;
   let lastAsciiUpdate = -Infinity;
@@ -599,6 +642,81 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     container.dataset.orbitActive = "true";
   } else {
     container.dataset.orbitActive = "false";
+  }
+
+  async function loadUrlModel() {
+    if (!GLTFLoaderClass || !settings.modelUrl) {
+      container.dataset.modelRuntime = "procedural";
+      return;
+    }
+
+    try {
+      container.dataset.modelRuntime = "loading-url";
+      const loader = new GLTFLoaderClass();
+      const gltf = await loader.loadAsync(settings.modelUrl);
+
+      if (disposed) {
+        disposeLoadedObject(gltf.scene);
+        return;
+      }
+
+      loadedModel = gltf.scene;
+      loadedModel.name = "Hero URL model";
+
+      const bounds = new THREE.Box3().setFromObject(loadedModel);
+      const size = bounds.getSize(new THREE.Vector3());
+      const center = bounds.getCenter(new THREE.Vector3());
+      const maxDimension = Math.max(size.x, size.y, size.z);
+      if (Number.isFinite(maxDimension) && maxDimension > 0) {
+        loadedModel.position.sub(center);
+        loadedModel.scale.setScalar(2.8 / maxDimension);
+      }
+
+      loadedModel.traverse((child) => {
+        const mesh = child as Mesh;
+        if (!mesh.isMesh) {
+          return;
+        }
+
+        mesh.castShadow = false;
+        mesh.receiveShadow = false;
+      });
+
+      const loadedEdgeSources: AsciiEdgeSource[] = [];
+      loadedModel.traverse((child) => {
+        const mesh = child as Mesh;
+        if (!mesh.isMesh || !mesh.geometry) {
+          return;
+        }
+
+        const edgeGeometry = new THREE.EdgesGeometry(mesh.geometry, 24);
+        geometries.push(edgeGeometry);
+        loadedEdgeSources.push({ geometry: edgeGeometry, object: mesh });
+      });
+
+      root.add(loadedModel);
+      proceduralGroup.visible = false;
+      if (loadedEdgeSources.length > 0) {
+        asciiEdgeSources = loadedEdgeSources;
+      }
+
+      container.dataset.modelRuntime = "url";
+      controls?.target.copy(root.position);
+      controls?.update();
+      renderNormalSide();
+      renderAsciiLayer(performance.now(), true);
+    } catch (error) {
+      console.warn("Hero GLB model failed to load; using procedural fallback.", error);
+      loadedModel = null;
+      proceduralGroup.visible = true;
+      asciiEdgeSources = [
+        { geometry: coreEdgesGeometry, object: core },
+        { geometry: shellEdgesGeometry, object: wireShell },
+      ];
+      container.dataset.modelRuntime = "procedural-fallback";
+      renderNormalSide();
+      renderAsciiLayer(performance.now(), true);
+    }
   }
 
   function setAsciiCanvasSize(nextWidth: number, nextHeight: number) {
@@ -905,34 +1023,22 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       : [];
     const shapeFrameStart = performance.now();
 
-    drawEdgesAsAscii(
-      coreEdgesGeometry,
-      core,
-      cells,
-      intensity,
-      shapeVectors,
-      columns,
-      rows,
-      cellWidth,
-      cellHeight,
-      viewportWidth,
-      viewportHeight,
-      asciiX,
-    );
-    drawEdgesAsAscii(
-      shellEdgesGeometry,
-      wireShell,
-      cells,
-      intensity,
-      shapeVectors,
-      columns,
-      rows,
-      cellWidth,
-      cellHeight,
-      viewportWidth,
-      viewportHeight,
-      asciiX,
-    );
+    asciiEdgeSources.forEach((source) => {
+      drawEdgesAsAscii(
+        source.geometry,
+        source.object,
+        cells,
+        intensity,
+        shapeVectors,
+        columns,
+        rows,
+        cellWidth,
+        cellHeight,
+        viewportWidth,
+        viewportHeight,
+        asciiX,
+      );
+    });
 
     const point = new THREE.Vector3();
     shards.forEach((shard) => {
@@ -1158,6 +1264,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   resizeObserver.observe(container);
   setAsciiCanvasSize(width, height);
   document.addEventListener("visibilitychange", handleVisibilityChange);
+  void loadUrlModel();
 
   renderFrame(0);
   if (!reduceMotion) {
@@ -1176,6 +1283,9 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       controls?.removeEventListener("end", handleOrbitEnd);
       controls?.removeEventListener("change", renderCameraChange);
       controls?.dispose();
+      if (loadedModel) {
+        disposeLoadedObject(loadedModel);
+      }
 
       geometries.forEach((geometry) => geometry.dispose());
       materials.forEach((material) => material.dispose());
@@ -1193,10 +1303,11 @@ export function initHeroThreeScenes() {
   }
 
   document.querySelectorAll<HTMLElement>("[data-hero-three-scene]").forEach((container) => {
-    if (activeScenes.has(container)) {
+    if (activeScenes.has(container) || pendingScenes.has(container)) {
       return;
     }
 
+    pendingScenes.add(container);
     createHeroThreeScene(container)
       .then((controller) => {
         if (controller) {
@@ -1206,6 +1317,9 @@ export function initHeroThreeScenes() {
       .catch((error) => {
         console.warn("Hero Three.js scene failed to initialize.", error);
         container.dataset.sceneState = "fallback";
+      })
+      .finally(() => {
+        pendingScenes.delete(container);
       });
   });
 }
@@ -1218,5 +1332,6 @@ export function destroyHeroThreeScenes() {
   document.querySelectorAll<HTMLElement>("[data-hero-three-scene]").forEach((container) => {
     activeScenes.get(container)?.destroy();
     activeScenes.delete(container);
+    pendingScenes.delete(container);
   });
 }
