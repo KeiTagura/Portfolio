@@ -5,6 +5,8 @@ type HeroThreeController = {
   destroy: () => void;
 };
 
+type AsciiSamplePattern = "center" | "grid" | "circle6";
+
 type HeroThreeSettings = {
   mode: string;
   modelUrl: string;
@@ -13,7 +15,26 @@ type HeroThreeSettings = {
   splitAngle: number;
   splitSoftness: number;
   showSplitLine: boolean;
-  asciiResolution: number;
+  ascii: {
+    enabled: boolean;
+    resolution: number;
+    updateFPS: number;
+    charset: string;
+    invert: boolean;
+    sampleCount: number;
+    samplePattern: AsciiSamplePattern;
+    contrast: number;
+    brightness: number;
+    gamma: number;
+    edgeBoost: number;
+    edgeThreshold: number;
+    cellAspect: number;
+    fontSize: number;
+    lineHeight: number;
+    useShapeAwareLookup: boolean;
+    useCachedLookup: boolean;
+    disableOnMobile: boolean;
+  };
   enableOrbitControls: boolean;
   orbit: {
     enableDamping: boolean;
@@ -46,11 +67,27 @@ function parseAngle(value: string | null, fallback: number) {
   return Number.isNaN(parsed) ? fallback : parsed;
 }
 
+function parseInteger(value: string | null, fallback: number) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+function readSamplePattern(value: string | undefined): AsciiSamplePattern {
+  return value === "center" || value === "circle6" || value === "grid" ? value : "grid";
+}
+
+function normalizeCharset(value: string | undefined) {
+  const characters = Array.from(value && value.length > 0 ? value : " .:-=+*#%@");
+  return characters.length > 1 ? characters : [" ", characters[0] ?? "@"];
+}
+
 function readSettings(container: HTMLElement): HeroThreeSettings {
+  const legacyAsciiResolution = container.dataset.asciiResolution ?? null;
+
   return {
     mode: container.dataset.mode ?? "three-ascii-split",
     modelUrl: container.dataset.modelUrl ?? "",
@@ -59,7 +96,26 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
     splitAngle: parseNumber(container.dataset.splitAngle ?? null, 0),
     splitSoftness: clampNumber(parseNumber(container.dataset.splitSoftness ?? null, 0.03), 0, 0.25),
     showSplitLine: container.dataset.showSplitLine !== "false",
-    asciiResolution: parseNumber(container.dataset.asciiResolution ?? null, 96),
+    ascii: {
+      enabled: container.dataset.asciiEnabled !== "false",
+      resolution: clampNumber(parseInteger(legacyAsciiResolution, 96), 16, 180),
+      updateFPS: clampNumber(parseNumber(container.dataset.asciiUpdateFps ?? null, 30), 1, 60),
+      charset: container.dataset.asciiCharset ?? " .:-=+*#%@",
+      invert: container.dataset.asciiInvert === "true",
+      sampleCount: clampNumber(parseInteger(container.dataset.asciiSampleCount ?? null, 4), 1, 8),
+      samplePattern: readSamplePattern(container.dataset.asciiSamplePattern),
+      contrast: clampNumber(parseNumber(container.dataset.asciiContrast ?? null, 1.4), 0.2, 4),
+      brightness: clampNumber(parseNumber(container.dataset.asciiBrightness ?? null, 1), 0, 3),
+      gamma: clampNumber(parseNumber(container.dataset.asciiGamma ?? null, 1), 0.2, 3),
+      edgeBoost: clampNumber(parseNumber(container.dataset.asciiEdgeBoost ?? null, 0.35), 0, 2),
+      edgeThreshold: clampNumber(parseNumber(container.dataset.asciiEdgeThreshold ?? null, 0.2), 0, 1),
+      cellAspect: clampNumber(parseNumber(container.dataset.asciiCellAspect ?? null, 1.8), 0.8, 3),
+      fontSize: clampNumber(parseNumber(container.dataset.asciiFontSize ?? null, 10), 6, 24),
+      lineHeight: clampNumber(parseNumber(container.dataset.asciiLineHeight ?? null, 10), 6, 32),
+      useShapeAwareLookup: container.dataset.asciiShapeAwareLookup === "true",
+      useCachedLookup: container.dataset.asciiCachedLookup !== "false",
+      disableOnMobile: container.dataset.asciiDisableOnMobile === "true",
+    },
     enableOrbitControls: container.dataset.orbitControls === "true",
     orbit: {
       enableDamping: container.dataset.orbitEnableDamping !== "false",
@@ -94,11 +150,41 @@ function shouldSkipForMobile(settings: HeroThreeSettings) {
   return settings.disableOnMobile && window.matchMedia("(max-width: 720px)").matches;
 }
 
+function getAsciiSampleOffsets(pattern: AsciiSamplePattern, sampleCount: number) {
+  if (pattern === "center" || sampleCount <= 1) {
+    return [{ x: 0, y: 0 }];
+  }
+
+  if (pattern === "circle6") {
+    return [
+      { x: 0, y: 0 },
+      { x: 0.34, y: 0 },
+      { x: 0.17, y: 0.29 },
+      { x: -0.17, y: 0.29 },
+      { x: -0.34, y: 0 },
+      { x: -0.17, y: -0.29 },
+      { x: 0.17, y: -0.29 },
+    ].slice(0, sampleCount);
+  }
+
+  return [
+    { x: -0.24, y: -0.24 },
+    { x: 0.24, y: -0.24 },
+    { x: -0.24, y: 0.24 },
+    { x: 0.24, y: 0.24 },
+    { x: 0, y: 0 },
+    { x: -0.36, y: 0 },
+    { x: 0.36, y: 0 },
+    { x: 0, y: -0.36 },
+  ].slice(0, sampleCount);
+}
+
 async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeController | null> {
   const settings = readSettings(container);
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const isSmallScreen = window.matchMedia("(max-width: 720px)").matches;
   const orbitEnabled = settings.enableOrbitControls && !(isSmallScreen && settings.orbit.disableOnMobile);
+  const asciiLayerEnabled = settings.ascii.enabled && !(isSmallScreen && settings.ascii.disableOnMobile);
 
   if (shouldSkipForMobile(settings) || !hasWebGLSupport()) {
     container.dataset.sceneState = "fallback";
@@ -307,9 +393,13 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   let lastAsciiUpdate = -Infinity;
   let disposed = false;
   let paused = document.visibilityState === "hidden";
-  const asciiUpdateInterval = reduceMotion ? Infinity : isSmallScreen ? 1000 / 8 : 1000 / 14;
-  const maxAsciiColumns = isSmallScreen ? 42 : Math.max(48, Math.min(96, settings.asciiResolution));
+  const asciiUpdateInterval = reduceMotion ? Infinity : 1000 / settings.ascii.updateFPS;
+  const maxAsciiColumns = isSmallScreen
+    ? Math.min(96, settings.ascii.resolution)
+    : settings.ascii.resolution;
   const splitAngleRadians = THREE.MathUtils.degToRad(settings.splitAngle);
+  const asciiCharacters = normalizeCharset(settings.ascii.charset);
+  const asciiSampleOffsets = getAsciiSampleOffsets(settings.ascii.samplePattern, settings.ascii.sampleCount);
 
   if (OrbitControlsClass) {
     controls = new OrbitControlsClass(camera, renderer.domElement);
@@ -349,6 +439,15 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   function renderNormalSide() {
     const drawingWidth = renderer.domElement.width;
     const drawingHeight = renderer.domElement.height;
+
+    if (!asciiLayerEnabled) {
+      renderer.setScissorTest(false);
+      renderer.clear();
+      renderer.setViewport(0, 0, drawingWidth, drawingHeight);
+      renderer.render(scene, camera);
+      return;
+    }
+
     const split = Math.floor(drawingWidth * settings.splitPosition);
     const softness =
       split <= 0 || split >= drawingWidth ? 0 : Math.floor(drawingWidth * settings.splitSoftness);
@@ -390,6 +489,42 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     return dx * dy > 0 ? "\\" : "/";
   }
 
+  function tuneAsciiValue(value: number) {
+    const brightened = value * settings.ascii.brightness;
+    const contrasted = (brightened - 0.5) * settings.ascii.contrast + 0.5;
+    const clamped = clampNumber(contrasted, 0, 1);
+    const gammaAdjusted = Math.pow(clamped, 1 / settings.ascii.gamma);
+    return settings.ascii.invert ? 1 - gammaAdjusted : gammaAdjusted;
+  }
+
+  function getCharacterFromAsciiValue(value: number) {
+    const index = Math.round(clampNumber(value, 0, 1) * (asciiCharacters.length - 1));
+    return asciiCharacters[index] ?? " ";
+  }
+
+  function getCellEdgeStrength(intensity: number[], columns: number, rows: number, column: number, row: number, value: number) {
+    let strongestDelta = 0;
+
+    for (let y = -1; y <= 1; y += 1) {
+      for (let x = -1; x <= 1; x += 1) {
+        if (x === 0 && y === 0) {
+          continue;
+        }
+
+        const nextColumn = column + x;
+        const nextRow = row + y;
+        if (nextColumn < 0 || nextColumn >= columns || nextRow < 0 || nextRow >= rows) {
+          continue;
+        }
+
+        const neighborValue = clampNumber(intensity[nextRow * columns + nextColumn] / 1.6, 0, 1);
+        strongestDelta = Math.max(strongestDelta, Math.abs(value - neighborValue));
+      }
+    }
+
+    return strongestDelta;
+  }
+
   function drawAsciiLine(
     cells: string[],
     intensity: number[],
@@ -405,23 +540,30 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   ) {
     const dx = x2 - x1;
     const dy = y2 - y1;
-    const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / Math.max(cellWidth, cellHeight) * 1.6));
+    const steps = Math.max(
+      1,
+      Math.ceil(Math.hypot(dx, dy) / Math.max(cellWidth, cellHeight) * (1.2 + asciiSampleOffsets.length * 0.22)),
+    );
     const character = getLineCharacter(dx, dy);
+    const sampleWeight = 0.72 / Math.sqrt(asciiSampleOffsets.length);
 
     for (let step = 0; step <= steps; step += 1) {
       const t = step / steps;
       const x = x1 + dx * t - xOffset;
       const y = y1 + dy * t;
-      const column = Math.floor(x / cellWidth);
-      const row = Math.floor(y / cellHeight);
 
-      if (column < 0 || column >= columns || row < 0 || row >= rows) {
-        continue;
+      for (const offset of asciiSampleOffsets) {
+        const column = Math.floor((x + offset.x * cellWidth) / cellWidth);
+        const row = Math.floor((y + offset.y * cellHeight) / cellHeight);
+
+        if (column < 0 || column >= columns || row < 0 || row >= rows) {
+          continue;
+        }
+
+        const index = row * columns + column;
+        intensity[index] += sampleWeight;
+        cells[index] = intensity[index] > 1.4 ? "#" : character;
       }
-
-      const index = row * columns + column;
-      intensity[index] += 0.72;
-      cells[index] = intensity[index] > 1.4 ? "#" : character;
     }
   }
 
@@ -437,17 +579,22 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     xOffset: number,
     weight = 0.5,
   ) {
-    const column = Math.floor((x - xOffset) / cellWidth);
-    const row = Math.floor(y / cellHeight);
+    const localX = x - xOffset;
+    const sampleWeight = weight / Math.sqrt(asciiSampleOffsets.length);
 
-    if (column < 0 || column >= columns || row < 0 || row >= rows) {
-      return;
+    for (const offset of asciiSampleOffsets) {
+      const column = Math.floor((localX + offset.x * cellWidth) / cellWidth);
+      const row = Math.floor((y + offset.y * cellHeight) / cellHeight);
+
+      if (column < 0 || column >= columns || row < 0 || row >= rows) {
+        continue;
+      }
+
+      const index = row * columns + column;
+      intensity[index] += sampleWeight;
+      const level = intensity[index];
+      cells[index] = level > 1.4 ? "@" : level > 0.9 ? "*" : level > 0.55 ? "+" : ".";
     }
-
-    const index = row * columns + column;
-    intensity[index] += weight;
-    const level = intensity[index];
-    cells[index] = level > 1.4 ? "@" : level > 0.9 ? "*" : level > 0.55 ? "+" : ".";
   }
 
   function drawEdgesAsAscii(
@@ -488,6 +635,11 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       return;
     }
 
+    if (!asciiLayerEnabled) {
+      asciiContext.clearRect(0, 0, container.clientWidth, container.clientHeight);
+      return;
+    }
+
     if (!force && time - lastAsciiUpdate < asciiUpdateInterval) {
       return;
     }
@@ -514,9 +666,9 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       return;
     }
 
-    const fullCellWidth = Math.max(8, viewportWidth / Math.max(32, maxAsciiColumns));
+    const fullCellWidth = Math.max(6, viewportWidth / Math.max(16, maxAsciiColumns));
     const cellWidth = fullCellWidth;
-    const cellHeight = fullCellWidth * 1.52;
+    const cellHeight = Math.max(settings.ascii.lineHeight, fullCellWidth * settings.ascii.cellAspect);
     const columns = Math.max(1, Math.floor(asciiWidth / cellWidth));
     const rows = Math.max(1, Math.floor(viewportHeight / cellHeight));
     const cells = Array.from({ length: columns * rows }, () => " ");
@@ -587,7 +739,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     asciiContext.beginPath();
     asciiContext.rect(asciiX, 0, asciiWidth, viewportHeight);
     asciiContext.clip();
-    asciiContext.font = `${Math.max(10, cellHeight * 0.86)}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+    asciiContext.font = `${settings.ascii.fontSize}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
     asciiContext.textBaseline = "middle";
     asciiContext.textAlign = "center";
     asciiContext.shadowColor = "rgba(87, 213, 255, 0.35)";
@@ -601,9 +753,21 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
           continue;
         }
 
-        const level = Math.min(1, intensity[index]);
+        let level = clampNumber(intensity[index] / 1.6, 0, 1);
+        const edgeStrength = getCellEdgeStrength(intensity, columns, rows, column, row, level);
+        const isEdge = edgeStrength >= settings.ascii.edgeThreshold;
+        if (isEdge && settings.ascii.edgeBoost > 0) {
+          level = clampNumber(level + edgeStrength * settings.ascii.edgeBoost, 0, 1);
+        }
+
+        const tunedLevel = tuneAsciiValue(level);
+        const mappedCharacter = settings.ascii.useShapeAwareLookup && isEdge ? character : getCharacterFromAsciiValue(tunedLevel);
         asciiContext.fillStyle =
-          level > 1.1 ? "rgba(255, 207, 90, 0.94)" : level > 0.64 ? "rgba(87, 213, 255, 0.86)" : "rgba(191, 239, 255, 0.58)";
+          tunedLevel > 0.72
+            ? "rgba(255, 207, 90, 0.94)"
+            : tunedLevel > 0.42
+              ? "rgba(87, 213, 255, 0.86)"
+              : "rgba(191, 239, 255, 0.58)";
         const characterX = asciiX + column * cellWidth + cellWidth * 0.5;
         let fade = 1;
         if (softness > 0) {
@@ -617,7 +781,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
         }
 
         asciiContext.globalAlpha = fade;
-        asciiContext.fillText(character, characterX, row * cellHeight + cellHeight * 0.55);
+        asciiContext.fillText(mappedCharacter, characterX, row * cellHeight + cellHeight * 0.55);
       }
     }
 
