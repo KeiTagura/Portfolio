@@ -206,7 +206,8 @@ main {
 .hero-visual,
 .hero-visual-fallback,
 .hero-three-scene,
-.hero-three-canvas {
+.hero-three-canvas,
+.hero-ascii-canvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -252,6 +253,13 @@ main {
 
 .hero-three-canvas {
   display: block;
+}
+
+.hero-ascii-canvas {
+  z-index: 2;
+  display: block;
+  pointer-events: none;
+  mix-blend-mode: screen;
 }
 
 .hero-media::after {

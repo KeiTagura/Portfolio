@@ -1,4 +1,4 @@
-import type { BufferGeometry, Material, Mesh, Points } from "three";
+import type { BufferGeometry, Material, Mesh, Object3D, Points, Vector3 } from "three";
 
 type HeroThreeController = {
   destroy: () => void;
@@ -75,7 +75,13 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   renderer.setSize(width, height, false);
   renderer.domElement.className = "hero-three-canvas";
   renderer.domElement.setAttribute("aria-hidden", "true");
-  container.replaceChildren(renderer.domElement);
+
+  const asciiCanvas = document.createElement("canvas");
+  asciiCanvas.className = "hero-ascii-canvas";
+  asciiCanvas.setAttribute("aria-hidden", "true");
+  const asciiContext = asciiCanvas.getContext("2d", { alpha: true });
+
+  container.replaceChildren(renderer.domElement, asciiCanvas);
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 120);
@@ -137,6 +143,8 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   const innerGeometry = new THREE.OctahedronGeometry(0.42, 0);
   const shellGeometry = new THREE.IcosahedronGeometry(1.55, 1);
   const shardGeometry = new THREE.TetrahedronGeometry(0.16, 0);
+  const coreEdgesGeometry = new THREE.EdgesGeometry(coreGeometry);
+  const shellEdgesGeometry = new THREE.EdgesGeometry(shellGeometry);
 
   const core = new THREE.Mesh(coreGeometry, coreMaterial);
   root.add(core);
@@ -200,6 +208,8 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     innerGeometry,
     shellGeometry,
     shardGeometry,
+    coreEdgesGeometry,
+    shellEdgesGeometry,
     gridGeometry,
     particleGeometry,
   ];
@@ -215,8 +225,257 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   let pointerX = 0;
   let pointerY = 0;
   let frameId = 0;
+  let lastAsciiUpdate = -Infinity;
   let disposed = false;
   let paused = document.visibilityState === "hidden";
+
+  function setAsciiCanvasSize(nextWidth: number, nextHeight: number) {
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, settings.maxPixelRatio);
+    asciiCanvas.width = Math.max(1, Math.floor(nextWidth * pixelRatio));
+    asciiCanvas.height = Math.max(1, Math.floor(nextHeight * pixelRatio));
+    asciiCanvas.style.width = `${nextWidth}px`;
+    asciiCanvas.style.height = `${nextHeight}px`;
+    asciiContext?.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  }
+
+  function renderNormalSide() {
+    const drawingWidth = renderer.domElement.width;
+    const drawingHeight = renderer.domElement.height;
+    const split = Math.floor(drawingWidth * settings.splitPosition);
+    const normalX = settings.asciiSide === "right" ? 0 : split;
+    const normalWidth = settings.asciiSide === "right" ? split : drawingWidth - split;
+
+    renderer.setScissorTest(false);
+    renderer.clear();
+    renderer.setViewport(0, 0, drawingWidth, drawingHeight);
+    renderer.setScissor(normalX, 0, Math.max(1, normalWidth), drawingHeight);
+    renderer.setScissorTest(true);
+    renderer.render(scene, camera);
+    renderer.setScissorTest(false);
+  }
+
+  function projectWorldToScreen(point: Vector3, viewportWidth: number, viewportHeight: number) {
+    const projected = point.clone().project(camera);
+    return {
+      x: (projected.x * 0.5 + 0.5) * viewportWidth,
+      y: (-projected.y * 0.5 + 0.5) * viewportHeight,
+      z: projected.z,
+    };
+  }
+
+  function getLineCharacter(dx: number, dy: number) {
+    const adx = Math.abs(dx);
+    const ady = Math.abs(dy);
+    if (adx > ady * 1.8) return "-";
+    if (ady > adx * 1.8) return "|";
+    return dx * dy > 0 ? "\\" : "/";
+  }
+
+  function drawAsciiLine(
+    cells: string[],
+    intensity: number[],
+    columns: number,
+    rows: number,
+    cellWidth: number,
+    cellHeight: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    xOffset: number,
+  ) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / Math.max(cellWidth, cellHeight) * 1.6));
+    const character = getLineCharacter(dx, dy);
+
+    for (let step = 0; step <= steps; step += 1) {
+      const t = step / steps;
+      const x = x1 + dx * t - xOffset;
+      const y = y1 + dy * t;
+      const column = Math.floor(x / cellWidth);
+      const row = Math.floor(y / cellHeight);
+
+      if (column < 0 || column >= columns || row < 0 || row >= rows) {
+        continue;
+      }
+
+      const index = row * columns + column;
+      intensity[index] += 0.72;
+      cells[index] = intensity[index] > 1.4 ? "#" : character;
+    }
+  }
+
+  function drawAsciiPoint(
+    cells: string[],
+    intensity: number[],
+    columns: number,
+    rows: number,
+    cellWidth: number,
+    cellHeight: number,
+    x: number,
+    y: number,
+    xOffset: number,
+    weight = 0.5,
+  ) {
+    const column = Math.floor((x - xOffset) / cellWidth);
+    const row = Math.floor(y / cellHeight);
+
+    if (column < 0 || column >= columns || row < 0 || row >= rows) {
+      return;
+    }
+
+    const index = row * columns + column;
+    intensity[index] += weight;
+    const level = intensity[index];
+    cells[index] = level > 1.4 ? "@" : level > 0.9 ? "*" : level > 0.55 ? "+" : ".";
+  }
+
+  function drawEdgesAsAscii(
+    geometry: BufferGeometry,
+    object: Object3D,
+    cells: string[],
+    intensity: number[],
+    columns: number,
+    rows: number,
+    cellWidth: number,
+    cellHeight: number,
+    viewportWidth: number,
+    viewportHeight: number,
+    xOffset: number,
+  ) {
+    const position = geometry.getAttribute("position");
+    const start = new THREE.Vector3();
+    const end = new THREE.Vector3();
+
+    object.updateWorldMatrix(true, false);
+
+    for (let index = 0; index < position.count; index += 2) {
+      start.fromBufferAttribute(position, index).applyMatrix4(object.matrixWorld);
+      end.fromBufferAttribute(position, index + 1).applyMatrix4(object.matrixWorld);
+      const a = projectWorldToScreen(start, viewportWidth, viewportHeight);
+      const b = projectWorldToScreen(end, viewportWidth, viewportHeight);
+
+      if (a.z < -1 || a.z > 1 || b.z < -1 || b.z > 1) {
+        continue;
+      }
+
+      drawAsciiLine(cells, intensity, columns, rows, cellWidth, cellHeight, a.x, a.y, b.x, b.y, xOffset);
+    }
+  }
+
+  function renderAsciiLayer(time: number, force = false) {
+    if (!asciiContext) {
+      return;
+    }
+
+    const updateInterval = reduceMotion ? Infinity : window.matchMedia("(max-width: 720px)").matches ? 1000 / 10 : 1000 / 16;
+    if (!force && time - lastAsciiUpdate < updateInterval) {
+      return;
+    }
+    lastAsciiUpdate = time;
+
+    const viewportWidth = container.clientWidth;
+    const viewportHeight = container.clientHeight;
+    const split = viewportWidth * settings.splitPosition;
+    const asciiX = settings.asciiSide === "right" ? split : 0;
+    const asciiWidth = settings.asciiSide === "right" ? viewportWidth - split : split;
+
+    if (asciiWidth <= 0) {
+      return;
+    }
+
+    const fullCellWidth = Math.max(8, viewportWidth / Math.max(32, settings.asciiResolution));
+    const cellWidth = fullCellWidth;
+    const cellHeight = fullCellWidth * 1.52;
+    const columns = Math.max(1, Math.floor(asciiWidth / cellWidth));
+    const rows = Math.max(1, Math.floor(viewportHeight / cellHeight));
+    const cells = Array.from({ length: columns * rows }, () => " ");
+    const intensity = Array.from({ length: columns * rows }, () => 0);
+
+    drawEdgesAsAscii(
+      coreEdgesGeometry,
+      core,
+      cells,
+      intensity,
+      columns,
+      rows,
+      cellWidth,
+      cellHeight,
+      viewportWidth,
+      viewportHeight,
+      asciiX,
+    );
+    drawEdgesAsAscii(
+      shellEdgesGeometry,
+      wireShell,
+      cells,
+      intensity,
+      columns,
+      rows,
+      cellWidth,
+      cellHeight,
+      viewportWidth,
+      viewportHeight,
+      asciiX,
+    );
+
+    const point = new THREE.Vector3();
+    shards.forEach((shard) => {
+      shard.updateWorldMatrix(true, false);
+      point.setFromMatrixPosition(shard.matrixWorld);
+      const projected = projectWorldToScreen(point, viewportWidth, viewportHeight);
+      if (projected.z >= -1 && projected.z <= 1) {
+        drawAsciiPoint(cells, intensity, columns, rows, cellWidth, cellHeight, projected.x, projected.y, asciiX, 0.62);
+      }
+    });
+
+    const particlePositionsAttribute = particleGeometry.getAttribute("position");
+    particles.updateWorldMatrix(true, false);
+    for (let index = 0; index < particlePositionsAttribute.count; index += 3) {
+      point.fromBufferAttribute(particlePositionsAttribute, index).applyMatrix4(particles.matrixWorld);
+      const projected = projectWorldToScreen(point, viewportWidth, viewportHeight);
+      if (projected.z >= -1 && projected.z <= 1) {
+        drawAsciiPoint(cells, intensity, columns, rows, cellWidth, cellHeight, projected.x, projected.y, asciiX, 0.28);
+      }
+    }
+
+    asciiContext.clearRect(0, 0, viewportWidth, viewportHeight);
+    const gradient = asciiContext.createLinearGradient(asciiX, 0, asciiX + asciiWidth, 0);
+    gradient.addColorStop(0, "rgba(8, 9, 13, 0.76)");
+    gradient.addColorStop(settings.asciiSide === "right" ? 1 : 0.2, "rgba(8, 9, 13, 0.42)");
+    asciiContext.fillStyle = gradient;
+    asciiContext.fillRect(asciiX, 0, asciiWidth, viewportHeight);
+
+    asciiContext.save();
+    asciiContext.beginPath();
+    asciiContext.rect(asciiX, 0, asciiWidth, viewportHeight);
+    asciiContext.clip();
+    asciiContext.font = `${Math.max(10, cellHeight * 0.86)}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+    asciiContext.textBaseline = "middle";
+    asciiContext.textAlign = "center";
+    asciiContext.shadowColor = "rgba(87, 213, 255, 0.35)";
+    asciiContext.shadowBlur = 7;
+
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < columns; column += 1) {
+        const index = row * columns + column;
+        const character = cells[index];
+        if (character === " ") {
+          continue;
+        }
+
+        const level = Math.min(1, intensity[index]);
+        asciiContext.fillStyle =
+          level > 1.1 ? "rgba(255, 207, 90, 0.94)" : level > 0.64 ? "rgba(87, 213, 255, 0.86)" : "rgba(191, 239, 255, 0.58)";
+        asciiContext.fillText(character, asciiX + column * cellWidth + cellWidth * 0.5, row * cellHeight + cellHeight * 0.55);
+      }
+    }
+
+    asciiContext.restore();
+    asciiContext.fillStyle = "rgba(255, 207, 90, 0.48)";
+    asciiContext.fillRect(split - 1, viewportHeight * 0.12, 2, viewportHeight * 0.74);
+  }
 
   const resizeObserver = new ResizeObserver((entries) => {
     const entry = entries[0];
@@ -230,7 +489,9 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     camera.updateProjectionMatrix();
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, settings.maxPixelRatio));
     renderer.setSize(nextWidth, nextHeight, false);
-    renderer.render(scene, camera);
+    setAsciiCanvasSize(nextWidth, nextHeight);
+    renderNormalSide();
+    renderAsciiLayer(0, true);
   });
 
   function handlePointerMove(event: PointerEvent) {
@@ -266,7 +527,8 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       shard.rotation.y += shardSpeed * 1.7;
     });
 
-    renderer.render(scene, camera);
+    renderNormalSide();
+    renderAsciiLayer(time, reduceMotion);
   }
 
   function animate(time: number) {
@@ -292,6 +554,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   }
 
   resizeObserver.observe(container);
+  setAsciiCanvasSize(width, height);
   container.addEventListener("pointermove", handlePointerMove, { passive: true });
   document.addEventListener("visibilitychange", handleVisibilityChange);
 
