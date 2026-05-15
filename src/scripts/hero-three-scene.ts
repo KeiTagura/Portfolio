@@ -100,6 +100,8 @@ function normalizeCharset(value: string | undefined) {
 
 function readSettings(container: HTMLElement): HeroThreeSettings {
   const legacyAsciiResolution = container.dataset.asciiResolution ?? null;
+  const minPolarAngle = clampNumber(parseNumber(container.dataset.orbitMinPolarAngle ?? null, 1.1), 0, Math.PI);
+  const maxPolarAngle = clampNumber(parseNumber(container.dataset.orbitMaxPolarAngle ?? null, 2.05), 0, Math.PI);
 
   return {
     mode: container.dataset.mode ?? "three-ascii-split",
@@ -140,8 +142,8 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
       enablePan: container.dataset.orbitEnablePan === "true",
       autoRotate: container.dataset.orbitAutoRotate !== "false",
       autoRotateSpeed: parseNumber(container.dataset.orbitAutoRotateSpeed ?? null, 0.35),
-      minPolarAngle: parseNumber(container.dataset.orbitMinPolarAngle ?? null, 1.1),
-      maxPolarAngle: parseNumber(container.dataset.orbitMaxPolarAngle ?? null, 2.05),
+      minPolarAngle: Math.min(minPolarAngle, maxPolarAngle),
+      maxPolarAngle: Math.max(minPolarAngle, maxPolarAngle),
       minAzimuthAngle: parseAngle(container.dataset.orbitMinAzimuthAngle ?? null, -Infinity),
       maxAzimuthAngle: parseAngle(container.dataset.orbitMaxAzimuthAngle ?? null, Infinity),
       rotateSpeed: parseNumber(container.dataset.orbitRotateSpeed ?? null, 0.45),
@@ -333,7 +335,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const isSmallScreen = window.matchMedia("(max-width: 720px)").matches;
   const orbitEnabled = settings.enableOrbitControls && !(isSmallScreen && settings.orbit.disableOnMobile);
-  const asciiLayerEnabled = settings.ascii.enabled && !(isSmallScreen && settings.ascii.disableOnMobile);
+  let asciiRuntimeEnabled = settings.ascii.enabled && !(isSmallScreen && settings.ascii.disableOnMobile);
 
   if (shouldSkipForMobile(settings) || !hasWebGLSupport()) {
     container.dataset.sceneState = "fallback";
@@ -379,10 +381,15 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   let controls: OrbitControls | null = null;
   let resumeAutoRotateTimer = 0;
   const autoRotateEnabled = settings.orbit.autoRotate && !reduceMotion;
+  container.dataset.orbitAutoRotateRuntime = autoRotateEnabled ? "enabled" : "disabled";
 
   function renderCameraChange() {
+    if (!reduceMotion && !paused) {
+      return;
+    }
+
     renderNormalSide();
-    renderAsciiLayer(performance.now(), true);
+    renderAsciiLayer(performance.now());
   }
 
   function handleOrbitStart() {
@@ -542,13 +549,19 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   let lastAsciiUpdate = -Infinity;
   let disposed = false;
   let paused = document.visibilityState === "hidden";
-  const asciiUpdateInterval = reduceMotion ? Infinity : 1000 / settings.ascii.updateFPS;
+  const effectiveAsciiUpdateFPS = isSmallScreen
+    ? Math.min(settings.ascii.updateFPS, 15)
+    : settings.ascii.updateFPS;
+  const asciiUpdateInterval = reduceMotion ? Infinity : 1000 / effectiveAsciiUpdateFPS;
   const maxAsciiColumns = isSmallScreen
-    ? Math.min(96, settings.ascii.resolution)
+    ? Math.min(64, settings.ascii.resolution)
     : settings.ascii.resolution;
   const splitAngleRadians = THREE.MathUtils.degToRad(settings.splitAngle);
   const asciiCharacters = normalizeCharset(settings.ascii.charset);
-  const asciiSampleOffsets = getAsciiSampleOffsets(settings.ascii.samplePattern, settings.ascii.sampleCount);
+  const effectiveAsciiSampleCount = isSmallScreen
+    ? Math.min(settings.ascii.sampleCount, 2)
+    : settings.ascii.sampleCount;
+  const asciiSampleOffsets = getAsciiSampleOffsets(settings.ascii.samplePattern, effectiveAsciiSampleCount);
   const shapeVectorSize = getShapeVectorSize(settings.ascii.shapeVectorMode);
   const shapeCharacterVectors = settings.ascii.useShapeAwareLookup
     ? createShapeVectorLookup(asciiCharacters, settings.ascii.shapeVectorMode, settings.ascii.fontSize)
@@ -556,6 +569,10 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   const shapeLookupCache = new Map<string, string>();
   let shapeAwareRuntimeEnabled = settings.ascii.useShapeAwareLookup && shapeCharacterVectors.length > 0 && !isSmallScreen;
   let slowShapeAwareFrames = 0;
+  container.dataset.asciiRuntime = asciiRuntimeEnabled ? "active" : "disabled";
+  container.dataset.asciiEffectiveResolution = String(maxAsciiColumns);
+  container.dataset.asciiEffectiveUpdateFps = String(effectiveAsciiUpdateFPS);
+  container.dataset.asciiEffectiveSampleCount = String(effectiveAsciiSampleCount);
   container.dataset.asciiShapeRuntime = shapeAwareRuntimeEnabled ? "shape-aware" : "brightness";
 
   if (OrbitControlsClass) {
@@ -597,7 +614,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     const drawingWidth = renderer.domElement.width;
     const drawingHeight = renderer.domElement.height;
 
-    if (!asciiLayerEnabled) {
+    if (!asciiRuntimeEnabled) {
       renderer.setScissorTest(false);
       renderer.clear();
       renderer.setViewport(0, 0, drawingWidth, drawingHeight);
@@ -840,12 +857,12 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     }
   }
 
-  function renderAsciiLayer(time: number, force = false) {
+  function renderAsciiLayerUnsafe(time: number, force = false) {
     if (!asciiContext) {
       return;
     }
 
-    if (!asciiLayerEnabled) {
+    if (!asciiRuntimeEnabled) {
       asciiContext.clearRect(0, 0, container.clientWidth, container.clientHeight);
       return;
     }
@@ -1041,6 +1058,28 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     }
   }
 
+  function disableAsciiFallback(error: unknown) {
+    console.warn("Hero ASCII renderer disabled; falling back to normal Three.js render.", error);
+    asciiRuntimeEnabled = false;
+    shapeAwareRuntimeEnabled = false;
+    shapeLookupCache.clear();
+    asciiContext?.clearRect(0, 0, container.clientWidth, container.clientHeight);
+    container.dataset.asciiRuntime = "fallback-normal";
+    container.dataset.asciiShapeRuntime = "fallback-brightness";
+    renderNormalSide();
+  }
+
+  function renderAsciiLayer(time: number, force = false) {
+    try {
+      renderAsciiLayerUnsafe(time, force);
+      if (asciiRuntimeEnabled) {
+        container.dataset.asciiRuntime = "active";
+      }
+    } catch (error) {
+      disableAsciiFallback(error);
+    }
+  }
+
   const resizeObserver = new ResizeObserver((entries) => {
     const entry = entries[0];
     if (!entry) {
@@ -1091,9 +1130,12 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       return;
     }
 
-    if (!paused) {
-      renderFrame(time);
+    if (paused) {
+      frameId = 0;
+      return;
     }
+
+    renderFrame(time);
 
     if (!reduceMotion) {
       frameId = window.requestAnimationFrame(animate);
@@ -1102,8 +1144,13 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
 
   function handleVisibilityChange() {
     paused = document.visibilityState === "hidden";
-    if (!paused && !reduceMotion) {
+    if (paused) {
       window.cancelAnimationFrame(frameId);
+      frameId = 0;
+      return;
+    }
+
+    if (!reduceMotion && frameId === 0) {
       frameId = window.requestAnimationFrame(animate);
     }
   }
