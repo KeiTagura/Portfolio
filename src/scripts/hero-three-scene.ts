@@ -1,4 +1,5 @@
 import type { BufferGeometry, Material, Mesh, Object3D, Points, Vector3 } from "three";
+import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 type HeroThreeController = {
   destroy: () => void;
@@ -13,8 +14,22 @@ type HeroThreeSettings = {
   splitSoftness: number;
   showSplitLine: boolean;
   asciiResolution: number;
-  enablePointerParallax: boolean;
   enableOrbitControls: boolean;
+  orbit: {
+    enableDamping: boolean;
+    dampingFactor: number;
+    enableZoom: boolean;
+    enablePan: boolean;
+    autoRotate: boolean;
+    autoRotateSpeed: number;
+    minPolarAngle: number;
+    maxPolarAngle: number;
+    minAzimuthAngle: number;
+    maxAzimuthAngle: number;
+    rotateSpeed: number;
+    touchRotateSpeed: number;
+    disableOnMobile: boolean;
+  };
   maxPixelRatio: number;
   disableOnMobile: boolean;
 };
@@ -24,6 +39,11 @@ const activeScenes = new WeakMap<HTMLElement, HeroThreeController>();
 function parseNumber(value: string | null, fallback: number) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseAngle(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? fallback : parsed;
 }
 
 function clampNumber(value: number, min: number, max: number) {
@@ -40,8 +60,22 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
     splitSoftness: clampNumber(parseNumber(container.dataset.splitSoftness ?? null, 0.03), 0, 0.25),
     showSplitLine: container.dataset.showSplitLine !== "false",
     asciiResolution: parseNumber(container.dataset.asciiResolution ?? null, 96),
-    enablePointerParallax: container.dataset.pointerParallax === "true",
     enableOrbitControls: container.dataset.orbitControls === "true",
+    orbit: {
+      enableDamping: container.dataset.orbitEnableDamping !== "false",
+      dampingFactor: parseNumber(container.dataset.orbitDampingFactor ?? null, 0.06),
+      enableZoom: container.dataset.orbitEnableZoom === "true",
+      enablePan: container.dataset.orbitEnablePan === "true",
+      autoRotate: container.dataset.orbitAutoRotate !== "false",
+      autoRotateSpeed: parseNumber(container.dataset.orbitAutoRotateSpeed ?? null, 0.35),
+      minPolarAngle: parseNumber(container.dataset.orbitMinPolarAngle ?? null, 1.1),
+      maxPolarAngle: parseNumber(container.dataset.orbitMaxPolarAngle ?? null, 2.05),
+      minAzimuthAngle: parseAngle(container.dataset.orbitMinAzimuthAngle ?? null, -Infinity),
+      maxAzimuthAngle: parseAngle(container.dataset.orbitMaxAzimuthAngle ?? null, Infinity),
+      rotateSpeed: parseNumber(container.dataset.orbitRotateSpeed ?? null, 0.45),
+      touchRotateSpeed: parseNumber(container.dataset.orbitTouchRotateSpeed ?? null, 0.35),
+      disableOnMobile: container.dataset.orbitDisableOnMobile === "true",
+    },
     maxPixelRatio: parseNumber(container.dataset.maxPixelRatio ?? null, 1.5),
     disableOnMobile: container.dataset.disableOnMobile === "true",
   };
@@ -64,11 +98,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   const settings = readSettings(container);
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const isSmallScreen = window.matchMedia("(max-width: 720px)").matches;
-  const allowPointerParallax =
-    settings.enablePointerParallax &&
-    !reduceMotion &&
-    !isSmallScreen &&
-    window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  const orbitEnabled = settings.enableOrbitControls && !(isSmallScreen && settings.orbit.disableOnMobile);
 
   if (shouldSkipForMobile(settings) || !hasWebGLSupport()) {
     container.dataset.sceneState = "fallback";
@@ -76,6 +106,9 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   }
 
   const THREE = await import("three");
+  const OrbitControlsClass = orbitEnabled
+    ? (await import("three/addons/controls/OrbitControls.js")).OrbitControls
+    : null;
   const bounds = container.getBoundingClientRect();
   const width = Math.max(1, Math.floor(bounds.width));
   const height = Math.max(1, Math.floor(bounds.height));
@@ -90,6 +123,8 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   renderer.setSize(width, height, false);
   renderer.domElement.className = "hero-three-canvas";
   renderer.domElement.setAttribute("aria-hidden", "true");
+  renderer.domElement.tabIndex = -1;
+  renderer.domElement.style.touchAction = orbitEnabled ? (isSmallScreen ? "pan-y" : "none") : "auto";
 
   const asciiCanvas = document.createElement("canvas");
   asciiCanvas.className = "hero-ascii-canvas";
@@ -105,6 +140,37 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   const root = new THREE.Group();
   root.position.set(1.35, 0.05, 0);
   scene.add(root);
+
+  let controls: OrbitControls | null = null;
+  let resumeAutoRotateTimer = 0;
+  const autoRotateEnabled = settings.orbit.autoRotate && !reduceMotion;
+
+  function renderCameraChange() {
+    renderNormalSide();
+    renderAsciiLayer(performance.now(), true);
+  }
+
+  function handleOrbitStart() {
+    if (!controls || !autoRotateEnabled) {
+      return;
+    }
+
+    window.clearTimeout(resumeAutoRotateTimer);
+    controls.autoRotate = false;
+  }
+
+  function handleOrbitEnd() {
+    if (!controls || !autoRotateEnabled) {
+      return;
+    }
+
+    window.clearTimeout(resumeAutoRotateTimer);
+    resumeAutoRotateTimer = window.setTimeout(() => {
+      if (controls && !paused && !disposed) {
+        controls.autoRotate = true;
+      }
+    }, 1200);
+  }
 
   const coreMaterial = new THREE.MeshStandardMaterial({
     color: 0x57d5ff,
@@ -237,8 +303,6 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     particleMaterial,
   ];
 
-  let pointerX = 0;
-  let pointerY = 0;
   let frameId = 0;
   let lastAsciiUpdate = -Infinity;
   let disposed = false;
@@ -246,6 +310,32 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   const asciiUpdateInterval = reduceMotion ? Infinity : isSmallScreen ? 1000 / 8 : 1000 / 14;
   const maxAsciiColumns = isSmallScreen ? 42 : Math.max(48, Math.min(96, settings.asciiResolution));
   const splitAngleRadians = THREE.MathUtils.degToRad(settings.splitAngle);
+
+  if (OrbitControlsClass) {
+    controls = new OrbitControlsClass(camera, renderer.domElement);
+    controls.target.copy(root.position);
+    controls.enableDamping = settings.orbit.enableDamping;
+    controls.dampingFactor = settings.orbit.dampingFactor;
+    controls.enableZoom = settings.orbit.enableZoom;
+    controls.enablePan = settings.orbit.enablePan;
+    controls.autoRotate = autoRotateEnabled;
+    controls.autoRotateSpeed = settings.orbit.autoRotateSpeed;
+    controls.minPolarAngle = settings.orbit.minPolarAngle;
+    controls.maxPolarAngle = settings.orbit.maxPolarAngle;
+    controls.minAzimuthAngle = settings.orbit.minAzimuthAngle;
+    controls.maxAzimuthAngle = settings.orbit.maxAzimuthAngle;
+    controls.rotateSpeed = isSmallScreen ? settings.orbit.touchRotateSpeed : settings.orbit.rotateSpeed;
+    controls.touches.ONE = THREE.TOUCH.ROTATE;
+    controls.touches.TWO = THREE.TOUCH.ROTATE;
+    controls.addEventListener("start", handleOrbitStart);
+    controls.addEventListener("end", handleOrbitEnd);
+    controls.addEventListener("change", renderCameraChange);
+    controls.update();
+    renderer.domElement.style.touchAction = isSmallScreen ? "pan-y" : "none";
+    container.dataset.orbitActive = "true";
+  } else {
+    container.dataset.orbitActive = "false";
+  }
 
   function setAsciiCanvasSize(nextWidth: number, nextHeight: number) {
     const pixelRatio = Math.min(window.devicePixelRatio || 1, settings.maxPixelRatio);
@@ -566,16 +656,6 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     renderAsciiLayer(0, true);
   });
 
-  function handlePointerMove(event: PointerEvent) {
-    if (!allowPointerParallax) {
-      return;
-    }
-
-    const rect = container.getBoundingClientRect();
-    pointerX = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
-    pointerY = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
-  }
-
   function renderFrame(time: number) {
     const seconds = time * 0.001;
     const speed = reduceMotion ? 0 : 1;
@@ -583,8 +663,8 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     const pulse = reduceMotion ? 1 : 1 + Math.sin(seconds * 1.15) * 0.035;
 
     root.position.y = 0.05 + float;
-    root.rotation.y = seconds * 0.16 * speed + pointerX * 0.1;
-    root.rotation.x = -0.08 + pointerY * 0.06;
+    root.rotation.y = seconds * 0.12 * speed;
+    root.rotation.x = -0.08;
     core.rotation.y = seconds * 0.34 * speed;
     core.rotation.x = seconds * 0.12 * speed;
     innerCore.rotation.y = -seconds * 0.5 * speed;
@@ -599,6 +679,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       shard.rotation.y += shardSpeed * 1.7;
     });
 
+    controls?.update();
     renderNormalSide();
     renderAsciiLayer(time, reduceMotion);
   }
@@ -627,7 +708,6 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
 
   resizeObserver.observe(container);
   setAsciiCanvasSize(width, height);
-  container.addEventListener("pointermove", handlePointerMove, { passive: true });
   document.addEventListener("visibilitychange", handleVisibilityChange);
 
   renderFrame(0);
@@ -640,9 +720,13 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     destroy() {
       disposed = true;
       window.cancelAnimationFrame(frameId);
+      window.clearTimeout(resumeAutoRotateTimer);
       resizeObserver.disconnect();
-      container.removeEventListener("pointermove", handlePointerMove);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      controls?.removeEventListener("start", handleOrbitStart);
+      controls?.removeEventListener("end", handleOrbitEnd);
+      controls?.removeEventListener("change", renderCameraChange);
+      controls?.dispose();
 
       geometries.forEach((geometry) => geometry.dispose());
       materials.forEach((material) => material.dispose());

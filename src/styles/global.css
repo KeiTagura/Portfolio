@@ -266,6 +266,10 @@ main {
   pointer-events: none;
 }
 
+.hero-three-scene[data-orbit-active="true"] {
+  pointer-events: auto;
+}
+
 .hero-three-scene[data-scene-state="ready"],
 .hero-three-scene[data-scene-state="ready-reduced-motion"] {
   opacity: 1;
@@ -273,6 +277,14 @@ main {
 
 .hero-three-canvas {
   display: block;
+}
+
+.hero-three-scene[data-orbit-active="true"] .hero-three-canvas {
+  cursor: grab;
+}
+
+.hero-three-scene[data-orbit-active="true"] .hero-three-canvas:active {
+  cursor: grabbing;
 }
 
 .hero-ascii-canvas {
