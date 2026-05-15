@@ -51,8 +51,12 @@ function shouldSkipForMobile(settings: HeroThreeSettings) {
 async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeController | null> {
   const settings = readSettings(container);
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const isSmallScreen = window.matchMedia("(max-width: 720px)").matches;
   const allowPointerParallax =
-    settings.enablePointerParallax && !reduceMotion && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    settings.enablePointerParallax &&
+    !reduceMotion &&
+    !isSmallScreen &&
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
   if (shouldSkipForMobile(settings) || !hasWebGLSupport()) {
     container.dataset.sceneState = "fallback";
@@ -68,7 +72,6 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     antialias: true,
     alpha: true,
     powerPreference: "high-performance",
-    preserveDrawingBuffer: true,
   });
   renderer.setClearColor(0x000000, 0);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, settings.maxPixelRatio));
@@ -228,6 +231,8 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   let lastAsciiUpdate = -Infinity;
   let disposed = false;
   let paused = document.visibilityState === "hidden";
+  const asciiUpdateInterval = reduceMotion ? Infinity : isSmallScreen ? 1000 / 8 : 1000 / 14;
+  const maxAsciiColumns = isSmallScreen ? 42 : Math.max(48, Math.min(96, settings.asciiResolution));
 
   function setAsciiCanvasSize(nextWidth: number, nextHeight: number) {
     const pixelRatio = Math.min(window.devicePixelRatio || 1, settings.maxPixelRatio);
@@ -369,8 +374,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       return;
     }
 
-    const updateInterval = reduceMotion ? Infinity : window.matchMedia("(max-width: 720px)").matches ? 1000 / 10 : 1000 / 16;
-    if (!force && time - lastAsciiUpdate < updateInterval) {
+    if (!force && time - lastAsciiUpdate < asciiUpdateInterval) {
       return;
     }
     lastAsciiUpdate = time;
@@ -385,7 +389,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       return;
     }
 
-    const fullCellWidth = Math.max(8, viewportWidth / Math.max(32, settings.asciiResolution));
+    const fullCellWidth = Math.max(8, viewportWidth / Math.max(32, maxAsciiColumns));
     const cellWidth = fullCellWidth;
     const cellHeight = fullCellWidth * 1.52;
     const columns = Math.max(1, Math.floor(asciiWidth / cellWidth));
@@ -473,8 +477,12 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     }
 
     asciiContext.restore();
-    asciiContext.fillStyle = "rgba(255, 207, 90, 0.48)";
-    asciiContext.fillRect(split - 1, viewportHeight * 0.12, 2, viewportHeight * 0.74);
+    const splitGradient = asciiContext.createLinearGradient(split - 10, 0, split + 10, 0);
+    splitGradient.addColorStop(0, "rgba(87, 213, 255, 0)");
+    splitGradient.addColorStop(0.5, "rgba(255, 207, 90, 0.62)");
+    splitGradient.addColorStop(1, "rgba(87, 213, 255, 0)");
+    asciiContext.fillStyle = splitGradient;
+    asciiContext.fillRect(split - 10, viewportHeight * 0.11, 20, viewportHeight * 0.76);
   }
 
   const resizeObserver = new ResizeObserver((entries) => {

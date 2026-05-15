@@ -232,6 +232,17 @@ main {
   pointer-events: none;
 }
 
+.hero-visual::after {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background:
+    linear-gradient(90deg, rgba(87, 213, 255, 0.1), transparent 38%, rgba(255, 207, 90, 0.08) 52%, transparent 72%),
+    radial-gradient(circle at 72% 42%, rgba(87, 213, 255, 0.13), transparent 26%);
+  content: "";
+  pointer-events: none;
+}
+
 .hero-visual-fallback {
   z-index: 0;
   background:
@@ -245,9 +256,11 @@ main {
   z-index: 1;
   opacity: 0;
   transition: opacity 420ms ease;
+  pointer-events: none;
 }
 
-.hero-three-scene[data-scene-state="ready"] {
+.hero-three-scene[data-scene-state="ready"],
+.hero-three-scene[data-scene-state="ready-reduced-motion"] {
   opacity: 1;
 }
 
@@ -265,10 +278,10 @@ main {
 .hero-media::after {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: 4;
   content: "";
   background:
-    linear-gradient(90deg, rgba(8, 9, 13, 0.97), rgba(8, 9, 13, 0.56) 52%, rgba(8, 9, 13, 0.74)),
+    linear-gradient(90deg, rgba(8, 9, 13, 0.97), rgba(8, 9, 13, 0.58) 46%, rgba(8, 9, 13, 0.76)),
     linear-gradient(0deg, var(--bg), transparent 42%);
   pointer-events: none;
 }
