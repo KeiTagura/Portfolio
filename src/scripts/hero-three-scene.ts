@@ -1,4 +1,4 @@
-import type { Mesh } from "three";
+import type { BufferGeometry, Material, Mesh, Points } from "three";
 
 type HeroThreeController = {
   destroy: () => void;
@@ -23,12 +23,10 @@ function parseNumber(value: string | null, fallback: number) {
 }
 
 function readSettings(container: HTMLElement): HeroThreeSettings {
-  const asciiSide = container.dataset.asciiSide === "left" ? "left" : "right";
-
   return {
     mode: container.dataset.mode ?? "three-ascii-split",
     modelUrl: container.dataset.modelUrl ?? "",
-    asciiSide,
+    asciiSide: container.dataset.asciiSide === "left" ? "left" : "right",
     splitPosition: parseNumber(container.dataset.splitPosition ?? null, 0.5),
     asciiResolution: parseNumber(container.dataset.asciiResolution ?? null, 96),
     enablePointerParallax: container.dataset.pointerParallax === "true",
@@ -52,6 +50,9 @@ function shouldSkipForMobile(settings: HeroThreeSettings) {
 
 async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeController | null> {
   const settings = readSettings(container);
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const allowPointerParallax =
+    settings.enablePointerParallax && !reduceMotion && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
   if (shouldSkipForMobile(settings) || !hasWebGLSupport()) {
     container.dataset.sceneState = "fallback";
@@ -77,104 +78,145 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   container.replaceChildren(renderer.domElement);
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
-  camera.position.set(0, 0.6, 6.8);
+  const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 120);
+  camera.position.set(0, 0.55, 7.2);
 
-  const group = new THREE.Group();
-  scene.add(group);
+  const root = new THREE.Group();
+  root.position.set(1.35, 0.05, 0);
+  scene.add(root);
 
-  const normalMaterial = new THREE.MeshStandardMaterial({
+  const coreMaterial = new THREE.MeshStandardMaterial({
     color: 0x57d5ff,
-    emissive: 0x0c526a,
-    emissiveIntensity: 0.28,
-    metalness: 0.42,
-    roughness: 0.36,
+    emissive: 0x0b4e65,
+    emissiveIntensity: 0.26,
+    metalness: 0.38,
+    roughness: 0.34,
     flatShading: true,
   });
 
-  const asciiPreviewMaterial = new THREE.MeshBasicMaterial({
+  const innerMaterial = new THREE.MeshStandardMaterial({
     color: 0xffcf5a,
+    emissive: 0x5b3b09,
+    emissiveIntensity: 0.22,
+    metalness: 0.2,
+    roughness: 0.48,
+    flatShading: true,
+  });
+
+  const wireMaterial = new THREE.MeshBasicMaterial({
+    color: 0xbfefff,
     wireframe: true,
     transparent: true,
-    opacity: 0.72,
+    opacity: 0.3,
   });
-
-  const coreGeometry = new THREE.IcosahedronGeometry(1.35, 1);
-  const core = new THREE.Mesh(coreGeometry, normalMaterial);
-  core.position.x = settings.asciiSide === "right" ? -0.42 : 0.42;
-  group.add(core);
-
-  const wire = new THREE.Mesh(coreGeometry.clone(), asciiPreviewMaterial);
-  wire.scale.setScalar(1.08);
-  wire.position.x = settings.asciiSide === "right" ? 0.55 : -0.55;
-  group.add(wire);
-
-  const splitMaterial = new THREE.LineBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.28,
-  });
-  const splitGeometry = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(0, -1.9, 0),
-    new THREE.Vector3(0, 1.9, 0),
-  ]);
-  const splitLine = new THREE.Line(splitGeometry, splitMaterial);
-  splitLine.position.x = (settings.splitPosition - 0.5) * 2.4;
-  group.add(splitLine);
 
   const shardMaterial = new THREE.MeshStandardMaterial({
     color: 0xff6f91,
-    emissive: 0x4c1224,
-    emissiveIntensity: 0.24,
-    roughness: 0.55,
-    metalness: 0.18,
+    emissive: 0x3f1020,
+    emissiveIntensity: 0.22,
+    roughness: 0.58,
+    metalness: 0.16,
     flatShading: true,
   });
-  const shardGeometry = new THREE.TetrahedronGeometry(0.18, 0);
-  const shards: Mesh[] = [];
 
-  for (let index = 0; index < 18; index += 1) {
+  const gridMaterial = new THREE.LineBasicMaterial({
+    color: 0x57d5ff,
+    transparent: true,
+    opacity: 0.13,
+  });
+
+  const particleMaterial = new THREE.PointsMaterial({
+    color: 0xffcf5a,
+    size: 0.022,
+    transparent: true,
+    opacity: 0.58,
+    depthWrite: false,
+  });
+
+  const coreGeometry = new THREE.IcosahedronGeometry(1.12, 1);
+  const innerGeometry = new THREE.OctahedronGeometry(0.42, 0);
+  const shellGeometry = new THREE.IcosahedronGeometry(1.55, 1);
+  const shardGeometry = new THREE.TetrahedronGeometry(0.16, 0);
+
+  const core = new THREE.Mesh(coreGeometry, coreMaterial);
+  root.add(core);
+
+  const innerCore = new THREE.Mesh(innerGeometry, innerMaterial);
+  innerCore.position.set(0.06, 0.02, 0.08);
+  root.add(innerCore);
+
+  const wireShell = new THREE.Mesh(shellGeometry, wireMaterial);
+  root.add(wireShell);
+
+  const shards: Mesh[] = [];
+  for (let index = 0; index < 20; index += 1) {
     const shard = new THREE.Mesh(shardGeometry, shardMaterial);
-    const angle = (index / 18) * Math.PI * 2;
-    const radius = 2.0 + (index % 4) * 0.22;
-    shard.position.set(Math.cos(angle) * radius, Math.sin(angle * 1.7) * 0.78, Math.sin(angle) * 0.9);
-    shard.rotation.set(angle, angle * 0.4, angle * 0.8);
+    const angle = (index / 20) * Math.PI * 2;
+    const radius = 1.95 + (index % 5) * 0.18;
+    shard.position.set(Math.cos(angle) * radius, Math.sin(angle * 1.5) * 0.72, Math.sin(angle) * 0.9);
+    shard.rotation.set(angle * 0.7, angle * 0.35, angle);
     shards.push(shard);
-    group.add(shard);
+    root.add(shard);
   }
 
-  const asciiDotMaterial = new THREE.PointsMaterial({
-    color: 0xffcf5a,
-    size: Math.max(0.025, 1 / settings.asciiResolution * 2.8),
-    transparent: true,
-    opacity: 0.55,
-  });
-  const asciiDotGeometry = new THREE.BufferGeometry();
-  const dotPositions: number[] = [];
-  for (let index = 0; index < 90; index += 1) {
-    const angle = index * 0.48;
-    const radius = 1.15 + (index % 9) * 0.025;
-    dotPositions.push(
-      (settings.asciiSide === "right" ? 0.72 : -0.72) + Math.cos(angle) * radius * 0.38,
-      Math.sin(angle * 1.8) * 1.15,
-      Math.sin(angle) * radius * 0.34,
+  const gridGeometry = new THREE.BufferGeometry();
+  const gridPoints: number[] = [];
+  const gridSize = 4.6;
+  const gridStep = 0.46;
+  for (let line = -5; line <= 5; line += 1) {
+    const offset = line * gridStep;
+    gridPoints.push(-gridSize, -1.75, offset, gridSize, -1.75, offset);
+    gridPoints.push(offset, -1.75, -gridSize, offset, -1.75, gridSize);
+  }
+  gridGeometry.setAttribute("position", new THREE.Float32BufferAttribute(gridPoints, 3));
+  const technicalGrid = new THREE.LineSegments(gridGeometry, gridMaterial);
+  technicalGrid.position.set(0, 0, -0.2);
+  root.add(technicalGrid);
+
+  const particleGeometry = new THREE.BufferGeometry();
+  const particlePositions: number[] = [];
+  for (let index = 0; index < 140; index += 1) {
+    const angle = index * 1.37;
+    const radius = 1.4 + ((index * 17) % 100) / 38;
+    particlePositions.push(
+      Math.cos(angle) * radius,
+      (((index * 29) % 100) / 100 - 0.5) * 3.2,
+      Math.sin(angle) * radius * 0.72,
     );
   }
-  asciiDotGeometry.setAttribute("position", new THREE.Float32BufferAttribute(dotPositions, 3));
-  const asciiDots = new THREE.Points(asciiDotGeometry, asciiDotMaterial);
-  group.add(asciiDots);
+  particleGeometry.setAttribute("position", new THREE.Float32BufferAttribute(particlePositions, 3));
+  const particles: Points = new THREE.Points(particleGeometry, particleMaterial);
+  root.add(particles);
 
-  const ambient = new THREE.AmbientLight(0x9fb8c8, 1.15);
-  const key = new THREE.DirectionalLight(0x57d5ff, 2.4);
+  const ambient = new THREE.AmbientLight(0x9fb8c8, 0.95);
+  const key = new THREE.DirectionalLight(0x57d5ff, 2.25);
   key.position.set(-2.8, 3.2, 4.6);
-  const rim = new THREE.DirectionalLight(0xffcf5a, 1.8);
+  const rim = new THREE.DirectionalLight(0xffcf5a, 1.65);
   rim.position.set(3, -1.2, 2.2);
   scene.add(ambient, key, rim);
+
+  const geometries: BufferGeometry[] = [
+    coreGeometry,
+    innerGeometry,
+    shellGeometry,
+    shardGeometry,
+    gridGeometry,
+    particleGeometry,
+  ];
+  const materials: Material[] = [
+    coreMaterial,
+    innerMaterial,
+    wireMaterial,
+    shardMaterial,
+    gridMaterial,
+    particleMaterial,
+  ];
 
   let pointerX = 0;
   let pointerY = 0;
   let frameId = 0;
   let disposed = false;
+  let paused = document.visibilityState === "hidden";
 
   const resizeObserver = new ResizeObserver((entries) => {
     const entry = entries[0];
@@ -188,10 +230,11 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     camera.updateProjectionMatrix();
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, settings.maxPixelRatio));
     renderer.setSize(nextWidth, nextHeight, false);
+    renderer.render(scene, camera);
   });
 
   function handlePointerMove(event: PointerEvent) {
-    if (!settings.enablePointerParallax) {
+    if (!allowPointerParallax) {
       return;
     }
 
@@ -200,31 +243,63 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     pointerY = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
   }
 
+  function renderFrame(time: number) {
+    const seconds = time * 0.001;
+    const speed = reduceMotion ? 0 : 1;
+    const float = reduceMotion ? 0 : Math.sin(seconds * 0.75) * 0.075;
+    const pulse = reduceMotion ? 1 : 1 + Math.sin(seconds * 1.15) * 0.035;
+
+    root.position.y = 0.05 + float;
+    root.rotation.y = seconds * 0.16 * speed + pointerX * 0.1;
+    root.rotation.x = -0.08 + pointerY * 0.06;
+    core.rotation.y = seconds * 0.34 * speed;
+    core.rotation.x = seconds * 0.12 * speed;
+    innerCore.rotation.y = -seconds * 0.5 * speed;
+    innerCore.scale.setScalar(pulse);
+    wireShell.rotation.y = -seconds * 0.22 * speed;
+    particles.rotation.y = seconds * 0.08 * speed;
+    technicalGrid.position.z = -0.2 + Math.sin(seconds * 0.35) * 0.05 * speed;
+
+    shards.forEach((shard, index) => {
+      const shardSpeed = speed * (0.003 + index * 0.00008);
+      shard.rotation.x += shardSpeed;
+      shard.rotation.y += shardSpeed * 1.7;
+    });
+
+    renderer.render(scene, camera);
+  }
+
   function animate(time: number) {
     if (disposed) {
       return;
     }
 
-    const seconds = time * 0.001;
-    group.rotation.y = seconds * 0.22 + pointerX * 0.14;
-    group.rotation.x = -0.08 + pointerY * 0.08;
-    core.rotation.y = seconds * 0.38;
-    wire.rotation.y = -seconds * 0.28;
-    asciiDots.rotation.y = seconds * 0.18;
+    if (!paused) {
+      renderFrame(time);
+    }
 
-    shards.forEach((shard, index) => {
-      shard.rotation.x += 0.004 + index * 0.0001;
-      shard.rotation.y += 0.006;
-    });
+    if (!reduceMotion) {
+      frameId = window.requestAnimationFrame(animate);
+    }
+  }
 
-    renderer.render(scene, camera);
-    frameId = window.requestAnimationFrame(animate);
+  function handleVisibilityChange() {
+    paused = document.visibilityState === "hidden";
+    if (!paused && !reduceMotion) {
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(animate);
+    }
   }
 
   resizeObserver.observe(container);
   container.addEventListener("pointermove", handlePointerMove, { passive: true });
-  frameId = window.requestAnimationFrame(animate);
-  container.dataset.sceneState = "ready";
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+
+  renderFrame(0);
+  if (!reduceMotion) {
+    frameId = window.requestAnimationFrame(animate);
+  }
+  container.dataset.sceneState = reduceMotion ? "ready-reduced-motion" : "ready";
 
   return {
     destroy() {
@@ -232,17 +307,10 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       window.cancelAnimationFrame(frameId);
       resizeObserver.disconnect();
       container.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
 
-      coreGeometry.dispose();
-      wire.geometry.dispose();
-      splitGeometry.dispose();
-      shardGeometry.dispose();
-      asciiDotGeometry.dispose();
-      normalMaterial.dispose();
-      asciiPreviewMaterial.dispose();
-      splitMaterial.dispose();
-      shardMaterial.dispose();
-      asciiDotMaterial.dispose();
+      geometries.forEach((geometry) => geometry.dispose());
+      materials.forEach((material) => material.dispose());
       renderer.dispose();
 
       container.replaceChildren();
