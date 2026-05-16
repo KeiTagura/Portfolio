@@ -19,10 +19,10 @@ export const site = {
     splitAngle: 0,
     splitSoftness: 0.00,
     showSplitLine: false,
-    modelUrl: "/media/hero/model.glb",
+    modelUrl: "/media/hero/StylizedPC.glb",
     modelMaterialMode: "force-unlit",
-    modelTextureSource: "external",
-    modelTextureUrl: "/media/hero/baked.jpg",
+    modelTextureSource: "embedded",
+    modelTextureUrl: "/media/hero/combinedBake.webp",
     modelAnimation: {
       enabled: false,
       clip: "first",

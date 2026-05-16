@@ -13,10 +13,11 @@ interface Props {
 }
 
 const { title = site.title, description = site.description, image = site.ogImage } = Astro.props;
+const htmlLang = site.locale.split(/[_-]/)[0] || "en";
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={htmlLang}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

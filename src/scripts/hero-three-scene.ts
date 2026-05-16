@@ -1,4 +1,4 @@
-import type { AnimationMixer, BufferGeometry, Material, Mesh, Object3D, Points, Texture, Vector3 } from "three";
+import type { AnimationClip, AnimationMixer, BufferGeometry, Color, Material, Mesh, Object3D, Points, Texture, Vector3 } from "three";
 import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 type HeroThreeController = {
@@ -20,6 +20,18 @@ type HeroModelTextureSource = "embedded" | "external";
 type AsciiEdgeSource = {
   geometry: BufferGeometry;
   object: Object3D;
+};
+
+type TextureBackedMaterial = Material & {
+  alphaTest?: number;
+  color?: { clone: () => Color };
+  map?: Texture | null;
+  metalness?: number;
+  opacity?: number;
+  roughness?: number;
+  side?: number;
+  toneMapped?: boolean;
+  transparent?: boolean;
 };
 
 type HeroThreeSettings = {
@@ -621,8 +633,13 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     { geometry: shellEdgesGeometry, object: wireShell },
   ];
   let loadedModel: Object3D | null = null;
+  let externalModelTexture: Texture | null = null;
+  let modelMixer: AnimationMixer | null = null;
+  const replacedModelMaterials = new Set<Material>();
+  const modelOwnedTextures = new Set<Texture>();
 
   let frameId = 0;
+  let lastFrameTime = 0;
   let lastAsciiUpdate = -Infinity;
   let disposed = false;
   let paused = document.visibilityState === "hidden";
@@ -644,6 +661,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     ? createShapeVectorLookup(asciiCharacters, settings.ascii.shapeVectorMode, settings.ascii.fontSize)
     : [];
   const shapeLookupCache = new Map<string, string>();
+  const hasAngledSplit = Math.abs(splitAngleRadians) > 0.001;
   let shapeAwareRuntimeEnabled = settings.ascii.useShapeAwareLookup && shapeCharacterVectors.length > 0 && !isSmallScreen;
   let slowShapeAwareFrames = 0;
   container.dataset.asciiRuntime = asciiRuntimeEnabled ? "active" : "disabled";
@@ -678,9 +696,157 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     container.dataset.orbitActive = "false";
   }
 
+  async function loadExternalModelTexture() {
+    if (settings.modelTextureSource !== "external" || !settings.modelTextureUrl) {
+      container.dataset.modelTextureRuntime = "embedded";
+      return null;
+    }
+
+    try {
+      const texture = await new THREE.TextureLoader().loadAsync(settings.modelTextureUrl);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.flipY = false;
+      texture.needsUpdate = true;
+      container.dataset.modelTextureRuntime = "external";
+      return texture;
+    } catch (error) {
+      console.warn("Hero model external texture failed to load; using model file textures.", error);
+      container.dataset.modelTextureRuntime = "embedded-fallback";
+      return null;
+    }
+  }
+
+  function buildMaterialParameters(source: Material, textureOverride: Texture | null) {
+    const material = source as TextureBackedMaterial;
+
+    return {
+      alphaTest: material.alphaTest,
+      color: material.color?.clone() ?? 0xffffff,
+      map: textureOverride ?? material.map ?? null,
+      name: material.name,
+      opacity: material.opacity,
+      side: material.side,
+      transparent: material.transparent,
+    };
+  }
+
+  function createModelMaterial(source: Material, textureOverride: Texture | null) {
+    const sourceMaterial = source as TextureBackedMaterial;
+    const sharedParameters = buildMaterialParameters(source, textureOverride);
+
+    if (sourceMaterial.map && sourceMaterial.map !== textureOverride) {
+      modelOwnedTextures.add(sourceMaterial.map);
+    }
+
+    if (settings.modelMaterialMode === "force-unlit") {
+      return new THREE.MeshBasicMaterial({
+        ...sharedParameters,
+        toneMapped: false,
+      });
+    }
+
+    if (settings.modelMaterialMode === "force-lit") {
+      return new THREE.MeshStandardMaterial({
+        ...sharedParameters,
+        metalness: sourceMaterial.metalness ?? 0.12,
+        roughness: sourceMaterial.roughness ?? 0.62,
+      });
+    }
+
+    if (textureOverride) {
+      sourceMaterial.map = textureOverride;
+      sourceMaterial.needsUpdate = true;
+    }
+
+    return source;
+  }
+
+  function applyModelMaterialSettings(model: Object3D, textureOverride: Texture | null) {
+    container.dataset.modelMaterialRuntime = settings.modelMaterialMode;
+
+    model.traverse((child) => {
+      const mesh = child as Mesh;
+      if (!mesh.isMesh) {
+        return;
+      }
+
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+
+      if (Array.isArray(mesh.material)) {
+        mesh.material = mesh.material.map((material) => {
+          const nextMaterial = createModelMaterial(material, textureOverride);
+          if (nextMaterial !== material) {
+            replacedModelMaterials.add(material);
+          }
+          return nextMaterial;
+        });
+        return;
+      }
+
+      const nextMaterial = createModelMaterial(mesh.material, textureOverride);
+      if (nextMaterial !== mesh.material) {
+        replacedModelMaterials.add(mesh.material);
+        mesh.material = nextMaterial;
+      }
+    });
+  }
+
+  function selectAnimationClip(clips: AnimationClip[]) {
+    if (clips.length === 0) {
+      return null;
+    }
+
+    if (settings.modelAnimation.clip === "first") {
+      return clips[0];
+    }
+
+    return clips.find((clip) => clip.name === settings.modelAnimation.clip) ?? clips[0];
+  }
+
+  function setupModelAnimation(model: Object3D, clips: AnimationClip[]) {
+    if (!settings.modelAnimation.enabled) {
+      container.dataset.modelAnimationRuntime = "disabled";
+      return;
+    }
+
+    if (reduceMotion) {
+      container.dataset.modelAnimationRuntime = "disabled-reduced-motion";
+      return;
+    }
+
+    const clip = selectAnimationClip(clips);
+    if (!clip) {
+      container.dataset.modelAnimationRuntime = "no-clips";
+      return;
+    }
+
+    modelMixer?.stopAllAction();
+    modelMixer = new THREE.AnimationMixer(model);
+    const action = modelMixer.clipAction(clip);
+    action.loop = settings.modelAnimation.loop ? THREE.LoopRepeat : THREE.LoopOnce;
+    action.clampWhenFinished = settings.modelAnimation.clampWhenFinished;
+    action.timeScale = settings.modelAnimation.timeScale;
+    action.play();
+    container.dataset.modelAnimationRuntime = "playing";
+    container.dataset.modelAnimationClipRuntime = clip.name || "first";
+  }
+
+  function disposeModelOverrideResources() {
+    disposeTexture(externalModelTexture);
+    externalModelTexture = null;
+    modelOwnedTextures.forEach((texture) => texture.dispose());
+    modelOwnedTextures.clear();
+    replacedModelMaterials.forEach((material) => material.dispose());
+    replacedModelMaterials.clear();
+  }
+
   async function loadUrlModel() {
     if (!GLTFLoaderClass || !settings.modelUrl) {
       container.dataset.modelRuntime = "procedural";
+      container.dataset.modelMaterialRuntime = "procedural";
+      container.dataset.modelTextureRuntime = "not-requested";
+      container.dataset.modelAnimationRuntime = "not-requested";
       return;
     }
 
@@ -696,6 +862,13 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
 
       loadedModel = gltf.scene;
       loadedModel.name = "Hero URL model";
+      externalModelTexture = await loadExternalModelTexture();
+      if (disposed) {
+        disposeModelOverrideResources();
+        disposeLoadedObject(loadedModel);
+        loadedModel = null;
+        return;
+      }
 
       const bounds = new THREE.Box3().setFromObject(loadedModel);
       const size = bounds.getSize(new THREE.Vector3());
@@ -706,15 +879,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
         loadedModel.scale.setScalar(2.8 / maxDimension);
       }
 
-      loadedModel.traverse((child) => {
-        const mesh = child as Mesh;
-        if (!mesh.isMesh) {
-          return;
-        }
-
-        mesh.castShadow = false;
-        mesh.receiveShadow = false;
-      });
+      applyModelMaterialSettings(loadedModel, externalModelTexture);
 
       const loadedEdgeSources: AsciiEdgeSource[] = [];
       loadedModel.traverse((child) => {
@@ -735,12 +900,20 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       }
 
       container.dataset.modelRuntime = "url";
+      setupModelAnimation(loadedModel, gltf.animations);
       controls?.target.copy(root.position);
       controls?.update();
       renderNormalSide();
       renderAsciiLayer(performance.now(), true);
     } catch (error) {
       console.warn("Hero GLB model failed to load; using procedural fallback.", error);
+      modelMixer?.stopAllAction();
+      modelMixer = null;
+      if (loadedModel) {
+        root.remove(loadedModel);
+        disposeLoadedObject(loadedModel);
+      }
+      disposeModelOverrideResources();
       loadedModel = null;
       proceduralGroup.visible = true;
       asciiEdgeSources = [
@@ -748,6 +921,9 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
         { geometry: shellEdgesGeometry, object: wireShell },
       ];
       container.dataset.modelRuntime = "procedural-fallback";
+      container.dataset.modelMaterialRuntime = "procedural-fallback";
+      container.dataset.modelTextureRuntime = "not-requested";
+      container.dataset.modelAnimationRuntime = "procedural-fallback";
       renderNormalSide();
       renderAsciiLayer(performance.now(), true);
     }
@@ -766,7 +942,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     const drawingWidth = renderer.domElement.width;
     const drawingHeight = renderer.domElement.height;
 
-    if (!asciiRuntimeEnabled) {
+    if (!asciiRuntimeEnabled || hasAngledSplit) {
       renderer.setScissorTest(false);
       renderer.clear();
       renderer.setViewport(0, 0, drawingWidth, drawingHeight);
@@ -1009,6 +1185,29 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     }
   }
 
+  function getSplitLineXAtY(split: number, viewportHeight: number, y: number) {
+    return split + Math.tan(splitAngleRadians) * (y - viewportHeight * 0.5);
+  }
+
+  function createAsciiClipPath(viewportWidth: number, viewportHeight: number, split: number) {
+    const topX = getSplitLineXAtY(split, viewportHeight, 0);
+    const bottomX = getSplitLineXAtY(split, viewportHeight, viewportHeight);
+
+    asciiContext?.beginPath();
+    if (settings.asciiSide === "right") {
+      asciiContext?.moveTo(topX, 0);
+      asciiContext?.lineTo(viewportWidth, 0);
+      asciiContext?.lineTo(viewportWidth, viewportHeight);
+      asciiContext?.lineTo(bottomX, viewportHeight);
+    } else {
+      asciiContext?.moveTo(0, 0);
+      asciiContext?.lineTo(topX, 0);
+      asciiContext?.lineTo(bottomX, viewportHeight);
+      asciiContext?.lineTo(0, viewportHeight);
+    }
+    asciiContext?.closePath();
+  }
+
   function renderAsciiLayerUnsafe(time: number, force = false) {
     if (!asciiContext) {
       return;
@@ -1028,17 +1227,19 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     const viewportHeight = container.clientHeight;
     const split = viewportWidth * settings.splitPosition;
     const softness = split <= 0 || split >= viewportWidth ? 0 : viewportWidth * settings.splitSoftness;
+    const splitTop = getSplitLineXAtY(split, viewportHeight, 0);
+    const splitBottom = getSplitLineXAtY(split, viewportHeight, viewportHeight);
+    const splitMin = Math.min(splitTop, splitBottom);
+    const splitMax = Math.max(splitTop, splitBottom);
     const asciiX =
       settings.asciiSide === "right"
-        ? clampNumber(split - softness, 0, viewportWidth)
+        ? clampNumber(splitMin - softness, 0, viewportWidth)
         : 0;
     const asciiEnd =
       settings.asciiSide === "right"
         ? viewportWidth
-        : clampNumber(split + softness, 0, viewportWidth);
+        : clampNumber(splitMax + softness, 0, viewportWidth);
     const asciiWidth = asciiEnd - asciiX;
-    const asciiFadeStart = settings.asciiSide === "right" ? split - softness : split + softness;
-    const asciiFadeEnd = split;
 
     if (asciiWidth <= 0) {
       asciiContext.clearRect(0, 0, viewportWidth, viewportHeight);
@@ -1106,11 +1307,14 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       gradient.addColorStop(1, "rgba(8, 9, 13, 0.1)");
     }
     asciiContext.fillStyle = gradient;
+    asciiContext.save();
+    createAsciiClipPath(viewportWidth, viewportHeight, split);
+    asciiContext.clip();
     asciiContext.fillRect(asciiX, 0, asciiWidth, viewportHeight);
+    asciiContext.restore();
 
     asciiContext.save();
-    asciiContext.beginPath();
-    asciiContext.rect(asciiX, 0, asciiWidth, viewportHeight);
+    createAsciiClipPath(viewportWidth, viewportHeight, split);
     asciiContext.clip();
     asciiContext.font = `${settings.ascii.fontSize}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
     asciiContext.textBaseline = "middle";
@@ -1152,19 +1356,21 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
               ? "rgba(87, 213, 255, 0.86)"
               : "rgba(191, 239, 255, 0.58)";
         const characterX = asciiX + column * cellWidth + cellWidth * 0.5;
+        const characterY = row * cellHeight + cellHeight * 0.55;
+        const splitLineX = getSplitLineXAtY(split, viewportHeight, characterY);
+        const signedDistance =
+          settings.asciiSide === "right"
+            ? characterX - splitLineX
+            : splitLineX - characterX;
         let fade = 1;
         if (softness > 0) {
-          if (settings.asciiSide === "right" && characterX < split) {
-            fade = clampNumber((characterX - asciiFadeStart) / Math.max(1, asciiFadeEnd - asciiFadeStart), 0, 1);
-          }
-
-          if (settings.asciiSide === "left" && characterX > split) {
-            fade = clampNumber((asciiFadeStart - characterX) / Math.max(1, asciiFadeStart - asciiFadeEnd), 0, 1);
-          }
+          fade = clampNumber((signedDistance + softness) / Math.max(1, softness * 2), 0, 1);
+        } else if (signedDistance < 0) {
+          continue;
         }
 
         asciiContext.globalAlpha = fade;
-        asciiContext.fillText(mappedCharacter, characterX, row * cellHeight + cellHeight * 0.55);
+        asciiContext.fillText(mappedCharacter, characterX, characterY);
       }
     }
 
@@ -1239,6 +1445,8 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
 
   function renderFrame(time: number) {
     const seconds = time * 0.001;
+    const deltaSeconds = lastFrameTime > 0 ? Math.min(0.05, (time - lastFrameTime) * 0.001) : 0;
+    lastFrameTime = time;
     const speed = reduceMotion ? 0 : 1;
     const float = reduceMotion ? 0 : Math.sin(seconds * 0.75) * 0.075;
     const pulse = reduceMotion ? 1 : 1 + Math.sin(seconds * 1.15) * 0.035;
@@ -1261,6 +1469,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     });
 
     controls?.update();
+    modelMixer?.update(deltaSeconds);
     renderNormalSide();
     renderAsciiLayer(time, reduceMotion);
   }
@@ -1291,6 +1500,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     }
 
     if (!reduceMotion && frameId === 0) {
+      lastFrameTime = 0;
       frameId = window.requestAnimationFrame(animate);
     }
   }
@@ -1317,10 +1527,13 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       controls?.removeEventListener("end", handleOrbitEnd);
       controls?.removeEventListener("change", renderCameraChange);
       controls?.dispose();
+      modelMixer?.stopAllAction();
+      modelMixer = null;
       if (loadedModel) {
         disposeLoadedObject(loadedModel);
       }
 
+      disposeModelOverrideResources();
       geometries.forEach((geometry) => geometry.dispose());
       materials.forEach((material) => material.dispose());
       renderer.dispose();
