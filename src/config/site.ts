@@ -20,6 +20,16 @@ export const site = {
     splitSoftness: 0.00,
     showSplitLine: false,
     modelUrl: "/media/hero/model.glb",
+    modelMaterialMode: "force-unlit",
+    modelTextureSource: "external",
+    modelTextureUrl: "/media/hero/baked.jpg",
+    modelAnimation: {
+      enabled: false,
+      clip: "first",
+      loop: true,
+      clampWhenFinished: true,
+      timeScale: 1,
+    },
     fallbackImage: "/media/hero/hero-fallback.webp",
     ascii: {
       enabled: true,

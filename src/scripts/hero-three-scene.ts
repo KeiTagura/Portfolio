@@ -1,4 +1,4 @@
-import type { BufferGeometry, Material, Mesh, Object3D, Points, Vector3 } from "three";
+import type { AnimationMixer, BufferGeometry, Material, Mesh, Object3D, Points, Texture, Vector3 } from "three";
 import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 type HeroThreeController = {
@@ -14,6 +14,8 @@ type AsciiCharacterVector = {
 };
 
 type HeroModelSource = "procedural" | "url";
+type HeroModelMaterialMode = "file" | "force-unlit" | "force-lit";
+type HeroModelTextureSource = "embedded" | "external";
 
 type AsciiEdgeSource = {
   geometry: BufferGeometry;
@@ -24,6 +26,16 @@ type HeroThreeSettings = {
   mode: string;
   modelSource: HeroModelSource;
   modelUrl: string;
+  modelMaterialMode: HeroModelMaterialMode;
+  modelTextureSource: HeroModelTextureSource;
+  modelTextureUrl: string;
+  modelAnimation: {
+    enabled: boolean;
+    clip: string;
+    loop: boolean;
+    clampWhenFinished: boolean;
+    timeScale: number;
+  };
   asciiSide: "left" | "right";
   splitPosition: number;
   splitAngle: number;
@@ -106,6 +118,14 @@ function readModelSource(value: string | undefined): HeroModelSource {
   return value === "url" ? "url" : "procedural";
 }
 
+function readModelMaterialMode(value: string | undefined): HeroModelMaterialMode {
+  return value === "force-unlit" || value === "force-lit" || value === "file" ? value : "file";
+}
+
+function readModelTextureSource(value: string | undefined): HeroModelTextureSource {
+  return value === "external" ? "external" : "embedded";
+}
+
 function normalizeCharset(value: string | undefined) {
   const characters = Array.from(value && value.length > 0 ? value : " .:-=+*#%@");
   return characters.length > 1 ? characters : [" ", characters[0] ?? "@"];
@@ -120,6 +140,16 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
     mode: container.dataset.mode ?? "three-ascii-split",
     modelSource: readModelSource(container.dataset.modelSource),
     modelUrl: container.dataset.modelUrl ?? "",
+    modelMaterialMode: readModelMaterialMode(container.dataset.modelMaterialMode),
+    modelTextureSource: readModelTextureSource(container.dataset.modelTextureSource),
+    modelTextureUrl: container.dataset.modelTextureUrl ?? "",
+    modelAnimation: {
+      enabled: container.dataset.modelAnimationEnabled === "true",
+      clip: container.dataset.modelAnimationClip ?? "first",
+      loop: container.dataset.modelAnimationLoop !== "false",
+      clampWhenFinished: container.dataset.modelAnimationClamp !== "false",
+      timeScale: clampNumber(parseNumber(container.dataset.modelAnimationTimeScale ?? null, 1), 0.05, 4),
+    },
     asciiSide: container.dataset.asciiSide === "left" ? "left" : "right",
     splitPosition: clampNumber(parseNumber(container.dataset.splitPosition ?? null, 0.5), 0, 1),
     splitAngle: parseNumber(container.dataset.splitAngle ?? null, 0),
@@ -359,6 +389,10 @@ function disposeLoadedObject(object: Object3D) {
       material?.dispose();
     }
   });
+}
+
+function disposeTexture(texture: Texture | null) {
+  texture?.dispose();
 }
 
 async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeController | null> {
