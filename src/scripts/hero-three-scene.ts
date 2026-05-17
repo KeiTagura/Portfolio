@@ -752,6 +752,8 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       return new THREE.MeshBasicMaterial({
         ...sharedParameters,
         toneMapped: false,
+          transparent: true,
+          alphaTest: 0.5, // Adjust this value between 0.0 and 1.0
       });
     }
 

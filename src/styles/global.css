@@ -336,7 +336,7 @@ main {
   background:
     linear-gradient(90deg, rgba(8, 9, 13, 0.97), rgba(8, 9, 13, 0.58) 46%, rgba(8, 9, 13, 0.76)),
     linear-gradient(0deg, var(--bg), transparent 42%);
-  opacity: var(--hero-media-overlay-opacity, 1);
+  opacity: var(--hero-media-overlay-opacity, 0);
   pointer-events: none;
 }
 

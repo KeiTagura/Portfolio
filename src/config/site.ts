@@ -37,7 +37,7 @@ export const site = {
     },
     mediaOverlay: {
       visible: true,
-      opacity: 1,
+      opacity: 0,
     },
     backgroundTitle: {
       enabled: true,
@@ -56,7 +56,7 @@ export const site = {
       charset: " .:-=+*#%@",
       invert: false,
       sampleCount: 4,
-      samplePattern: "center",
+      samplePattern: "grid",
       contrast: 1.4,
       brightness: 1,
       gamma: 1,
