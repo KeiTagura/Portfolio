@@ -448,8 +448,18 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   asciiCanvas.className = "hero-ascii-canvas";
   asciiCanvas.setAttribute("aria-hidden", "true");
   const asciiContext = asciiCanvas.getContext("2d", { alpha: true });
+  const backgroundTitle =
+    container.dataset.backgroundTitleEnabled === "true" && container.dataset.backgroundTitleText
+      ? document.createElement("div")
+      : null;
 
-  container.replaceChildren(renderer.domElement, asciiCanvas);
+  if (backgroundTitle) {
+    backgroundTitle.className = "hero-background-title";
+    backgroundTitle.textContent = container.dataset.backgroundTitleText ?? "";
+    backgroundTitle.setAttribute("aria-hidden", "true");
+  }
+
+  container.replaceChildren(...(backgroundTitle ? [backgroundTitle] : []), renderer.domElement, asciiCanvas);
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 120);

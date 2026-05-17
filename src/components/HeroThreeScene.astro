@@ -10,13 +10,31 @@ const modelTextureUrl = visual.modelTextureUrl ? withBase(visual.modelTextureUrl
 const modelAnimation = visual.modelAnimation;
 const orbit = visual.orbit;
 const ascii = visual.ascii;
+const fallbackTint = visual.fallbackTint;
+const mediaOverlay = visual.mediaOverlay;
+const backgroundTitle = visual.backgroundTitle;
 const splitPosition = Math.min(1, Math.max(0, visual.splitPosition));
 const splitSoftness = Math.min(0.25, Math.max(0, visual.splitSoftness));
+const overlayOpacity = mediaOverlay.visible ? Math.min(1, Math.max(0, mediaOverlay.opacity)) : 0;
+const normalTitleColor =
+  visual.asciiSide === "left" ? backgroundTitle.asciiColor : backgroundTitle.normalColor;
+const asciiTitleColor =
+  visual.asciiSide === "left" ? backgroundTitle.normalColor : backgroundTitle.asciiColor;
 const visualStyles = [
   `--hero-fallback-image: url("${fallbackImage}")`,
+  `--hero-fallback-tint-color: ${fallbackTint.color}`,
+  `--hero-fallback-tint-blend-mode: ${fallbackTint.blendMode}`,
+  `--hero-media-overlay-opacity: ${overlayOpacity}`,
   `--hero-split-position: ${splitPosition * 100}%`,
   `--hero-split-softness: ${splitSoftness * 100}%`,
   `--hero-split-line-color: rgba(255, 207, 90, ${visual.showSplitLine ? 0.22 : 0})`,
+  `--hero-background-title-normal-color: ${normalTitleColor}`,
+  `--hero-background-title-ascii-color: ${asciiTitleColor}`,
+  `--hero-background-title-opacity: ${backgroundTitle.opacity}`,
+  `--hero-background-title-font-size: ${backgroundTitle.fontSize}`,
+  `--hero-background-title-x: ${backgroundTitle.x}`,
+  `--hero-background-title-y: ${backgroundTitle.y}`,
+  `--hero-background-title-gradient-angle: ${90 + visual.splitAngle}deg`,
 ].join("; ");
 ---
 
@@ -34,6 +52,8 @@ const visualStyles = [
         class="hero-three-scene"
         data-hero-three-scene
         data-mode={visual.mode}
+        data-background-title-enabled={String(backgroundTitle.enabled)}
+        data-background-title-text={backgroundTitle.text}
         data-model-source={visual.modelSource}
         data-model-url={modelUrl}
         data-model-material-mode={visual.modelMaterialMode}

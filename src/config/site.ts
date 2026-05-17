@@ -31,6 +31,24 @@ export const site = {
       timeScale: 1,
     },
     fallbackImage: "/media/hero/hero-fallback.webp",
+    fallbackTint: {
+      color: "rgba(87, 213, 255, 0.22)",
+      blendMode: "multiply",
+    },
+    mediaOverlay: {
+      visible: true,
+      opacity: 1,
+    },
+    backgroundTitle: {
+      enabled: true,
+      text: "ART // CODE",
+      normalColor: "rgba(244, 247, 251, 1)",
+      asciiColor: "rgba(87, 213, 255, 1)",
+      opacity: 1,
+      fontSize: "clamp(5rem, 16vw, 13rem)",
+      x: "0%",
+      y: "-30%",
+    },
     ascii: {
       enabled: true,
       resolution: 180,

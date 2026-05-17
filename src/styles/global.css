@@ -206,6 +206,7 @@ main {
 .hero-visual,
 .hero-visual-fallback,
 .hero-three-scene,
+.hero-background-title,
 .hero-three-canvas,
 .hero-ascii-canvas {
   position: absolute;
@@ -253,9 +254,11 @@ main {
 .hero-visual-fallback {
   z-index: 0;
   background:
+    linear-gradient(var(--hero-fallback-tint-color, rgba(87, 213, 255, 0.16)), var(--hero-fallback-tint-color, rgba(87, 213, 255, 0.16))),
     linear-gradient(90deg, rgba(8, 9, 13, 0.86), rgba(8, 9, 13, 0.22) 54%, rgba(8, 9, 13, 0.7)),
     var(--hero-fallback-image) center / cover no-repeat,
     var(--bg);
+  background-blend-mode: var(--hero-fallback-tint-blend-mode, multiply), normal, normal, normal;
   opacity: 1;
 }
 
@@ -275,7 +278,38 @@ main {
   opacity: 1;
 }
 
+.hero-background-title {
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: clamp(18px, 5vw, 72px);
+  background:
+    linear-gradient(
+      var(--hero-background-title-gradient-angle, 90deg),
+      var(--hero-background-title-normal-color, rgba(244, 247, 251, 0.09)) 0,
+      var(--hero-background-title-normal-color, rgba(244, 247, 251, 0.09)) var(--hero-split-position, 50%),
+      var(--hero-background-title-ascii-color, rgba(87, 213, 255, 0.18)) var(--hero-split-position, 50%),
+      var(--hero-background-title-ascii-color, rgba(87, 213, 255, 0.18)) 100%
+    );
+  background-clip: text;
+  color: transparent;
+  font-size: var(--hero-background-title-font-size, clamp(5rem, 16vw, 13rem));
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 0.82;
+  opacity: var(--hero-background-title-opacity, 1);
+  pointer-events: none;
+  text-align: center;
+  text-transform: uppercase;
+  transform: translate(var(--hero-background-title-x, 0%), var(--hero-background-title-y, 0%));
+  white-space: nowrap;
+  -webkit-background-clip: text;
+  user-select: none;
+}
+
 .hero-three-canvas {
+  z-index: 1;
   display: block;
 }
 
@@ -302,6 +336,7 @@ main {
   background:
     linear-gradient(90deg, rgba(8, 9, 13, 0.97), rgba(8, 9, 13, 0.58) 46%, rgba(8, 9, 13, 0.76)),
     linear-gradient(0deg, var(--bg), transparent 42%);
+  opacity: var(--hero-media-overlay-opacity, 1);
   pointer-events: none;
 }
 
