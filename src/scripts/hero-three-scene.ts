@@ -1,4 +1,4 @@
-import type { AnimationClip, AnimationMixer, BufferGeometry, Color, Material, Mesh, Object3D, Points, Texture, Vector3 } from "three";
+import type { AnimationClip, AnimationMixer, BufferGeometry, Color, Material, Mesh, Object3D, Points, Texture, Vector3, WebGLRenderTarget } from "three";
 import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 type HeroThreeController = {
@@ -17,8 +17,14 @@ type AsciiCharacterVector = {
 type HeroModelSource = "procedural" | "url";
 type HeroModelMaterialMode = "file" | "force-unlit" | "force-lit";
 type HeroModelTextureSource = "embedded" | "external";
+type HeroRenderMode = "normalOnly" | "edgeProjection" | "pixelSample";
 
 type AsciiEdgeSource = {
+  geometry: BufferGeometry;
+  object: Object3D;
+};
+
+type AsciiSurfaceSource = {
   geometry: BufferGeometry;
   object: Object3D;
 };
@@ -37,6 +43,7 @@ type TextureBackedMaterial = Material & {
 
 type HeroThreeSettings = {
   mode: string;
+  renderMode: HeroRenderMode;
   modelSource: HeroModelSource;
   modelUrl: string;
   modelMaterialMode: HeroModelMaterialMode;
@@ -80,6 +87,15 @@ type HeroThreeSettings = {
     gamma: number;
     edgeBoost: number;
     edgeThreshold: number;
+    surfaceFill: boolean;
+    surfaceFillStrength: number;
+    surfacePointDensity: number;
+    useDepthForBrightness: boolean;
+    depthBrightnessStrength: number;
+    useNormalLighting: boolean;
+    normalLightingStrength: number;
+    edgeDominance: number;
+    pixelSampleDisableOnMobile: boolean;
     cellAspect: number;
     fontSize: number;
     lineHeight: number;
@@ -144,6 +160,10 @@ function readDensityMode(value: string | undefined): AsciiDensityMode {
   return value === "fit-width" ? "fit-width" : "fixed-cell";
 }
 
+function readRenderMode(value: string | undefined): HeroRenderMode {
+  return value === "normalOnly" || value === "pixelSample" || value === "edgeProjection" ? value : "edgeProjection";
+}
+
 function readModelSource(value: string | undefined): HeroModelSource {
   return value === "url" ? "url" : "procedural";
 }
@@ -168,6 +188,7 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
 
   return {
     mode: container.dataset.mode ?? "three-ascii-split",
+    renderMode: readRenderMode(container.dataset.renderMode),
     modelSource: readModelSource(container.dataset.modelSource),
     modelUrl: container.dataset.modelUrl ?? "",
     modelMaterialMode: readModelMaterialMode(container.dataset.modelMaterialMode),
@@ -211,6 +232,15 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
       gamma: clampNumber(parseNumber(container.dataset.asciiGamma ?? null, 1), 0.2, 3),
       edgeBoost: clampNumber(parseNumber(container.dataset.asciiEdgeBoost ?? null, 0.35), 0, 2),
       edgeThreshold: clampNumber(parseNumber(container.dataset.asciiEdgeThreshold ?? null, 0.2), 0, 1),
+      surfaceFill: container.dataset.asciiSurfaceFill === "true",
+      surfaceFillStrength: clampNumber(parseNumber(container.dataset.asciiSurfaceFillStrength ?? null, 0.35), 0, 1),
+      surfacePointDensity: clampNumber(parseNumber(container.dataset.asciiSurfacePointDensity ?? null, 0.25), 0, 1),
+      useDepthForBrightness: container.dataset.asciiDepthBrightness === "true",
+      depthBrightnessStrength: clampNumber(parseNumber(container.dataset.asciiDepthBrightnessStrength ?? null, 0.45), 0, 1),
+      useNormalLighting: container.dataset.asciiNormalLighting === "true",
+      normalLightingStrength: clampNumber(parseNumber(container.dataset.asciiNormalLightingStrength ?? null, 0.5), 0, 1),
+      edgeDominance: clampNumber(parseNumber(container.dataset.asciiEdgeDominance ?? null, 0.8), 0, 1),
+      pixelSampleDisableOnMobile: container.dataset.asciiPixelSampleDisableOnMobile === "true",
       cellAspect: clampNumber(parseNumber(container.dataset.asciiCellAspect ?? null, 1.8), 0.8, 3),
       fontSize: clampNumber(parseNumber(container.dataset.asciiFontSize ?? null, 10), 6, 24),
       lineHeight: clampNumber(parseNumber(container.dataset.asciiLineHeight ?? null, 10), 6, 32),
@@ -443,7 +473,18 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const isSmallScreen = window.matchMedia("(max-width: 720px)").matches;
   const orbitEnabled = settings.enableOrbitControls && !(isSmallScreen && settings.orbit.disableOnMobile);
-  let asciiRuntimeEnabled = settings.ascii.enabled && !(isSmallScreen && settings.ascii.disableOnMobile);
+  const requestedRenderMode =
+    settings.renderMode === "pixelSample" && isSmallScreen && settings.ascii.pixelSampleDisableOnMobile
+      ? "edgeProjection"
+      : settings.renderMode;
+  let activeRenderMode: HeroRenderMode = requestedRenderMode;
+  let asciiRuntimeEnabled =
+    activeRenderMode !== "normalOnly" && settings.ascii.enabled && !(isSmallScreen && settings.ascii.disableOnMobile);
+  container.dataset.renderModeRequested = settings.renderMode;
+  container.dataset.renderModeRuntime =
+    settings.renderMode === "pixelSample" && requestedRenderMode === "edgeProjection"
+      ? "pixelSample-disabled-mobile-edgeProjection"
+      : activeRenderMode;
 
   if (shouldSkipForMobile(settings) || !hasWebGLSupport()) {
     container.dataset.sceneState = "fallback";
@@ -673,9 +714,17 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     { geometry: coreEdgesGeometry, object: core },
     { geometry: shellEdgesGeometry, object: wireShell },
   ];
+  let asciiSurfaceSources: AsciiSurfaceSource[] = [
+    { geometry: coreGeometry, object: core },
+    { geometry: innerGeometry, object: innerCore },
+  ];
   let loadedModel: Object3D | null = null;
   let externalModelTexture: Texture | null = null;
   let modelMixer: AnimationMixer | null = null;
+  let pixelSampleTarget: WebGLRenderTarget | null = null;
+  let pixelSampleBuffer: Uint8Array | null = null;
+  let pixelSampleWidth = 0;
+  let pixelSampleHeight = 0;
   const replacedModelMaterials = new Set<Material>();
   const modelOwnedTextures = new Set<Texture>();
 
@@ -706,6 +755,9 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   let shapeAwareRuntimeEnabled = settings.ascii.useShapeAwareLookup && shapeCharacterVectors.length > 0 && !isSmallScreen;
   let slowShapeAwareFrames = 0;
   container.dataset.asciiRuntime = asciiRuntimeEnabled ? "active" : "disabled";
+  if (settings.renderMode === "pixelSample") {
+    container.dataset.pixelSampleRuntime = activeRenderMode === "pixelSample" ? "active" : "disabled-mobile";
+  }
   container.dataset.asciiDensityRuntime = settings.ascii.densityMode;
   container.dataset.asciiEffectiveResolution = String(maxAsciiColumns);
   container.dataset.asciiEffectiveUpdateFps = String(effectiveAsciiUpdateFPS);
@@ -727,6 +779,30 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       cellWidth,
       cellHeight: Math.max(settings.ascii.lineHeight, cellWidth * settings.ascii.cellAspect),
     };
+  }
+
+  function disposePixelSampleTarget() {
+    pixelSampleTarget?.dispose();
+    pixelSampleTarget = null;
+    pixelSampleBuffer = null;
+    pixelSampleWidth = 0;
+    pixelSampleHeight = 0;
+  }
+
+  function ensurePixelSampleTarget(width: number, height: number) {
+    if (pixelSampleTarget && pixelSampleWidth === width && pixelSampleHeight === height && pixelSampleBuffer) {
+      return;
+    }
+
+    disposePixelSampleTarget();
+    pixelSampleTarget = new THREE.WebGLRenderTarget(width, height, {
+      depthBuffer: true,
+      stencilBuffer: false,
+    });
+    pixelSampleTarget.texture.name = "Hero pixel-sample ASCII source";
+    pixelSampleBuffer = new Uint8Array(width * height * 4);
+    pixelSampleWidth = width;
+    pixelSampleHeight = height;
   }
 
   if (OrbitControlsClass) {
@@ -943,6 +1019,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       applyModelMaterialSettings(loadedModel, externalModelTexture);
 
       const loadedEdgeSources: AsciiEdgeSource[] = [];
+      const loadedSurfaceSources: AsciiSurfaceSource[] = [];
       loadedModel.traverse((child) => {
         const mesh = child as Mesh;
         if (!mesh.isMesh || !mesh.geometry) {
@@ -952,12 +1029,16 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
         const edgeGeometry = new THREE.EdgesGeometry(mesh.geometry, 24);
         geometries.push(edgeGeometry);
         loadedEdgeSources.push({ geometry: edgeGeometry, object: mesh });
+        loadedSurfaceSources.push({ geometry: mesh.geometry, object: mesh });
       });
 
       root.add(loadedModel);
       proceduralGroup.visible = false;
       if (loadedEdgeSources.length > 0) {
         asciiEdgeSources = loadedEdgeSources;
+      }
+      if (loadedSurfaceSources.length > 0) {
+        asciiSurfaceSources = loadedSurfaceSources;
       }
 
       container.dataset.modelRuntime = "url";
@@ -980,6 +1061,10 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       asciiEdgeSources = [
         { geometry: coreEdgesGeometry, object: core },
         { geometry: shellEdgesGeometry, object: wireShell },
+      ];
+      asciiSurfaceSources = [
+        { geometry: coreGeometry, object: core },
+        { geometry: innerGeometry, object: innerCore },
       ];
       container.dataset.modelRuntime = "procedural-fallback";
       container.dataset.modelMaterialRuntime = "procedural-fallback";
@@ -1065,6 +1150,29 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     return asciiCharacters[index] ?? " ";
   }
 
+  function getPixelSampleValue(buffer: Uint8Array, x: number, y: number, width: number, height: number) {
+    const clampedX = clampNumber(Math.round(x), 0, width - 1);
+    const clampedY = clampNumber(Math.round(y), 0, height - 1);
+    const flippedY = height - 1 - clampedY;
+    const index = (flippedY * width + clampedX) * 4;
+    const red = buffer[index] / 255;
+    const green = buffer[index + 1] / 255;
+    const blue = buffer[index + 2] / 255;
+    const alpha = buffer[index + 3] / 255;
+    return (red * 0.2126 + green * 0.7152 + blue * 0.0722) * alpha;
+  }
+
+  function getPixelSampleEdgeBoost(buffer: Uint8Array, x: number, y: number, width: number, height: number, value: number) {
+    if (settings.ascii.edgeBoost <= 0) {
+      return 0;
+    }
+
+    const right = getPixelSampleValue(buffer, x + 1, y, width, height);
+    const down = getPixelSampleValue(buffer, x, y + 1, width, height);
+    const edge = Math.max(Math.abs(value - right), Math.abs(value - down));
+    return edge >= settings.ascii.edgeThreshold ? edge * settings.ascii.edgeBoost : 0;
+  }
+
   function getCellEdgeStrength(intensity: number[], columns: number, rows: number, column: number, row: number, value: number) {
     let strongestDelta = 0;
 
@@ -1123,6 +1231,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   function drawAsciiLine(
     cells: string[],
     intensity: number[],
+    cellKinds: Uint8Array,
     shapeVectors: number[],
     columns: number,
     rows: number,
@@ -1141,7 +1250,8 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       Math.ceil(Math.hypot(dx, dy) / Math.max(cellWidth, cellHeight) * (1.2 + asciiSampleOffsets.length * 0.22)),
     );
     const character = getLineCharacter(dx, dy);
-    const sampleWeight = 0.72 / Math.sqrt(asciiSampleOffsets.length);
+    const edgeWeight = 0.72 * (0.55 + settings.ascii.edgeDominance * 0.65);
+    const sampleWeight = edgeWeight / Math.sqrt(asciiSampleOffsets.length);
 
     for (let step = 0; step <= steps; step += 1) {
       const t = step / steps;
@@ -1158,6 +1268,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
 
         const index = row * columns + column;
         intensity[index] += sampleWeight;
+        cellKinds[index] = 2;
         cells[index] = intensity[index] > 1.4 ? "#" : character;
         addShapeSample(
           shapeVectors,
@@ -1175,6 +1286,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   function drawAsciiPoint(
     cells: string[],
     intensity: number[],
+    cellKinds: Uint8Array,
     shapeVectors: number[],
     columns: number,
     rows: number,
@@ -1198,6 +1310,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
 
       const index = row * columns + column;
       intensity[index] += sampleWeight;
+      cellKinds[index] = Math.max(cellKinds[index], 2);
       const level = intensity[index];
       cells[index] = level > 1.4 ? "@" : level > 0.9 ? "*" : level > 0.55 ? "+" : ".";
       addShapeSample(
@@ -1212,11 +1325,56 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     }
   }
 
+  function drawAsciiSurfacePoint(
+    cells: string[],
+    intensity: number[],
+    cellKinds: Uint8Array,
+    shapeVectors: number[],
+    columns: number,
+    rows: number,
+    cellWidth: number,
+    cellHeight: number,
+    x: number,
+    y: number,
+    xOffset: number,
+    weight: number,
+  ) {
+    const localX = x - xOffset;
+    const column = Math.floor(localX / cellWidth);
+    const row = Math.floor(y / cellHeight);
+
+    if (column < 0 || column >= columns || row < 0 || row >= rows) {
+      return;
+    }
+
+    const index = row * columns + column;
+    if (cellKinds[index] === 2 && intensity[index] > weight * (1 + settings.ascii.edgeDominance)) {
+      return;
+    }
+
+    intensity[index] += weight;
+    if (cellKinds[index] < 2) {
+      cellKinds[index] = 1;
+      cells[index] = weight > 0.46 ? "+" : weight > 0.28 ? ":" : ".";
+    }
+
+    addShapeSample(
+      shapeVectors,
+      columns,
+      column,
+      row,
+      localX / cellWidth - column,
+      y / cellHeight - row,
+      weight * 0.65,
+    );
+  }
+
   function drawEdgesAsAscii(
     geometry: BufferGeometry,
     object: Object3D,
     cells: string[],
     intensity: number[],
+    cellKinds: Uint8Array,
     shapeVectors: number[],
     columns: number,
     rows: number,
@@ -1242,7 +1400,114 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
         continue;
       }
 
-      drawAsciiLine(cells, intensity, shapeVectors, columns, rows, cellWidth, cellHeight, a.x, a.y, b.x, b.y, xOffset);
+      drawAsciiLine(cells, intensity, cellKinds, shapeVectors, columns, rows, cellWidth, cellHeight, a.x, a.y, b.x, b.y, xOffset);
+    }
+  }
+
+  function getTriangleVertexIndex(indexAttribute: ReturnType<BufferGeometry["getIndex"]>, triangleIndex: number, corner: number) {
+    return indexAttribute ? indexAttribute.getX(triangleIndex * 3 + corner) : triangleIndex * 3 + corner;
+  }
+
+  function getSurfaceWeight(projectedZ: number, normal: Vector3) {
+    let weight = settings.ascii.surfaceFillStrength;
+
+    if (settings.ascii.useDepthForBrightness) {
+      const depthNearness = 1 - clampNumber((projectedZ + 1) * 0.5, 0, 1);
+      weight *= 1 - settings.ascii.depthBrightnessStrength + depthNearness * settings.ascii.depthBrightnessStrength * 1.6;
+    }
+
+    if (settings.ascii.useNormalLighting) {
+      const lightDirection = new THREE.Vector3(-0.35, 0.68, 0.64).normalize();
+      const light = clampNumber(normal.dot(lightDirection) * 0.5 + 0.5, 0, 1);
+      weight *= 1 - settings.ascii.normalLightingStrength + light * settings.ascii.normalLightingStrength;
+    }
+
+    return clampNumber(weight, 0, 1);
+  }
+
+  function drawSurfaceAsAscii(
+    geometry: BufferGeometry,
+    object: Object3D,
+    cells: string[],
+    intensity: number[],
+    cellKinds: Uint8Array,
+    shapeVectors: number[],
+    columns: number,
+    rows: number,
+    cellWidth: number,
+    cellHeight: number,
+    viewportWidth: number,
+    viewportHeight: number,
+    xOffset: number,
+  ) {
+    if (!settings.ascii.surfaceFill || settings.ascii.surfaceFillStrength <= 0 || settings.ascii.surfacePointDensity <= 0) {
+      return;
+    }
+
+    const position = geometry.getAttribute("position");
+    if (!position || position.count < 3) {
+      return;
+    }
+
+    const normalAttribute = geometry.getAttribute("normal");
+    const indexAttribute = geometry.getIndex();
+    const triangleCount = indexAttribute ? Math.floor(indexAttribute.count / 3) : Math.floor(position.count / 3);
+    const density = isSmallScreen ? Math.min(settings.ascii.surfacePointDensity, 0.12) : settings.ascii.surfacePointDensity;
+    const sampleStep = Math.max(1, Math.ceil(1 / Math.max(0.02, density)));
+    const sampleBudget = isSmallScreen ? 260 : 900;
+    const budgetStep = Math.max(1, Math.ceil(triangleCount / sampleBudget));
+    const step = Math.max(sampleStep, budgetStep);
+    const a = new THREE.Vector3();
+    const b = new THREE.Vector3();
+    const c = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    const normal = new THREE.Vector3();
+    const normalA = new THREE.Vector3();
+    const normalB = new THREE.Vector3();
+    const normalC = new THREE.Vector3();
+
+    object.updateWorldMatrix(true, false);
+    const normalMatrix = new THREE.Matrix3().getNormalMatrix(object.matrixWorld);
+
+    for (let triangleIndex = 0; triangleIndex < triangleCount; triangleIndex += step) {
+      const ia = getTriangleVertexIndex(indexAttribute, triangleIndex, 0);
+      const ib = getTriangleVertexIndex(indexAttribute, triangleIndex, 1);
+      const ic = getTriangleVertexIndex(indexAttribute, triangleIndex, 2);
+
+      a.fromBufferAttribute(position, ia);
+      b.fromBufferAttribute(position, ib);
+      c.fromBufferAttribute(position, ic);
+      center.copy(a).add(b).add(c).multiplyScalar(1 / 3).applyMatrix4(object.matrixWorld);
+
+      if (normalAttribute) {
+        normalA.fromBufferAttribute(normalAttribute, ia);
+        normalB.fromBufferAttribute(normalAttribute, ib);
+        normalC.fromBufferAttribute(normalAttribute, ic);
+        normal.copy(normalA).add(normalB).add(normalC).normalize();
+      } else {
+        normal.copy(c).sub(b).cross(a.clone().sub(b)).normalize();
+      }
+      normal.applyMatrix3(normalMatrix).normalize();
+
+      const projected = projectWorldToScreen(center, viewportWidth, viewportHeight);
+      if (projected.z < -1 || projected.z > 1) {
+        continue;
+      }
+
+      drawAsciiSurfacePoint(
+        cells,
+        intensity,
+        cellKinds,
+        shapeVectors,
+        columns,
+        rows,
+        cellWidth,
+        cellHeight,
+        projected.x,
+        projected.y,
+        xOffset,
+        getSurfaceWeight(projected.z, normal),
+      );
     }
   }
 
@@ -1312,10 +1577,29 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     const rows = Math.max(1, Math.floor(viewportHeight / cellHeight));
     const cells = Array.from({ length: columns * rows }, () => " ");
     const intensity = Array.from({ length: columns * rows }, () => 0);
+    const cellKinds = new Uint8Array(columns * rows);
     const shapeVectors = shapeAwareRuntimeEnabled
       ? Array.from({ length: columns * rows * shapeVectorSize }, () => 0)
       : [];
     const shapeFrameStart = performance.now();
+
+    asciiSurfaceSources.forEach((source) => {
+      drawSurfaceAsAscii(
+        source.geometry,
+        source.object,
+        cells,
+        intensity,
+        cellKinds,
+        shapeVectors,
+        columns,
+        rows,
+        cellWidth,
+        cellHeight,
+        viewportWidth,
+        viewportHeight,
+        asciiX,
+      );
+    });
 
     asciiEdgeSources.forEach((source) => {
       drawEdgesAsAscii(
@@ -1323,6 +1607,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
         source.object,
         cells,
         intensity,
+        cellKinds,
         shapeVectors,
         columns,
         rows,
@@ -1340,7 +1625,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       point.setFromMatrixPosition(shard.matrixWorld);
       const projected = projectWorldToScreen(point, viewportWidth, viewportHeight);
       if (projected.z >= -1 && projected.z <= 1) {
-        drawAsciiPoint(cells, intensity, shapeVectors, columns, rows, cellWidth, cellHeight, projected.x, projected.y, asciiX, 0.62);
+        drawAsciiPoint(cells, intensity, cellKinds, shapeVectors, columns, rows, cellWidth, cellHeight, projected.x, projected.y, asciiX, 0.62);
       }
     });
 
@@ -1350,7 +1635,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       point.fromBufferAttribute(particlePositionsAttribute, index).applyMatrix4(particles.matrixWorld);
       const projected = projectWorldToScreen(point, viewportWidth, viewportHeight);
       if (projected.z >= -1 && projected.z <= 1) {
-        drawAsciiPoint(cells, intensity, shapeVectors, columns, rows, cellWidth, cellHeight, projected.x, projected.y, asciiX, 0.28);
+        drawAsciiPoint(cells, intensity, cellKinds, shapeVectors, columns, rows, cellWidth, cellHeight, projected.x, projected.y, asciiX, 0.28);
       }
     }
 
@@ -1463,12 +1748,146 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     }
   }
 
+  function renderPixelSampleAsciiLayerUnsafe(time: number, force = false) {
+    if (!asciiContext) {
+      return;
+    }
+
+    if (!asciiRuntimeEnabled) {
+      asciiContext.clearRect(0, 0, container.clientWidth, container.clientHeight);
+      return;
+    }
+
+    if (!force && time - lastAsciiUpdate < asciiUpdateInterval) {
+      return;
+    }
+    lastAsciiUpdate = time;
+
+    const viewportWidth = container.clientWidth;
+    const viewportHeight = container.clientHeight;
+    const split = viewportWidth * settings.splitPosition;
+    const softness = split <= 0 || split >= viewportWidth ? 0 : viewportWidth * settings.splitSoftness;
+    const splitTop = getSplitLineXAtY(split, viewportHeight, 0);
+    const splitBottom = getSplitLineXAtY(split, viewportHeight, viewportHeight);
+    const splitMin = Math.min(splitTop, splitBottom);
+    const splitMax = Math.max(splitTop, splitBottom);
+    const asciiX = settings.asciiSide === "right" ? clampNumber(splitMin - softness, 0, viewportWidth) : 0;
+    const asciiEnd = settings.asciiSide === "right" ? viewportWidth : clampNumber(splitMax + softness, 0, viewportWidth);
+    const asciiWidth = asciiEnd - asciiX;
+
+    if (asciiWidth <= 0) {
+      asciiContext.clearRect(0, 0, viewportWidth, viewportHeight);
+      return;
+    }
+
+    const { cellWidth, cellHeight } = getAsciiCellMetrics(viewportWidth);
+    const columns = Math.max(1, Math.floor(asciiWidth / cellWidth));
+    const rows = Math.max(1, Math.floor(viewportHeight / cellHeight));
+    const fullColumns = Math.max(1, Math.ceil(viewportWidth / cellWidth));
+    const targetWidth = Math.max(16, Math.min(isSmallScreen ? 96 : 220, fullColumns));
+    const targetHeight = Math.max(12, Math.min(isSmallScreen ? 80 : 140, rows));
+
+    ensurePixelSampleTarget(targetWidth, targetHeight);
+    if (!pixelSampleTarget || !pixelSampleBuffer) {
+      throw new Error("Pixel sample render target was not created.");
+    }
+
+    const previousTarget = renderer.getRenderTarget();
+    const drawingWidth = renderer.domElement.width;
+    const drawingHeight = renderer.domElement.height;
+    renderer.setRenderTarget(pixelSampleTarget);
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, targetWidth, targetHeight);
+    renderer.clear();
+    renderer.render(scene, camera);
+    renderer.readRenderTargetPixels(pixelSampleTarget, 0, 0, targetWidth, targetHeight, pixelSampleBuffer);
+    renderer.setRenderTarget(previousTarget);
+    renderer.setViewport(0, 0, drawingWidth, drawingHeight);
+
+    asciiContext.clearRect(0, 0, viewportWidth, viewportHeight);
+    const gradient = asciiContext.createLinearGradient(asciiX, 0, asciiX + asciiWidth, 0);
+    if (settings.asciiSide === "right") {
+      gradient.addColorStop(0, "rgba(8, 9, 13, 0.1)");
+      gradient.addColorStop(Math.min(1, softness > 0 ? softness / asciiWidth : 0), "rgba(8, 9, 13, 0.76)");
+      gradient.addColorStop(1, "rgba(8, 9, 13, 0.42)");
+    } else {
+      gradient.addColorStop(0, "rgba(8, 9, 13, 0.42)");
+      gradient.addColorStop(Math.max(0, 1 - (softness > 0 ? softness / asciiWidth : 0)), "rgba(8, 9, 13, 0.76)");
+      gradient.addColorStop(1, "rgba(8, 9, 13, 0.1)");
+    }
+
+    asciiContext.save();
+    createAsciiClipPath(viewportWidth, viewportHeight, split);
+    asciiContext.clip();
+    asciiContext.fillStyle = gradient;
+    asciiContext.fillRect(asciiX, 0, asciiWidth, viewportHeight);
+    asciiContext.font = `${settings.ascii.fontSize}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+    asciiContext.textBaseline = "middle";
+    asciiContext.textAlign = "center";
+    asciiContext.shadowColor = "rgba(87, 213, 255, 0.28)";
+    asciiContext.shadowBlur = 5;
+
+    for (let row = 0; row < rows; row += 1) {
+      const characterY = row * cellHeight + cellHeight * 0.55;
+      const sampleY = (characterY / viewportHeight) * (targetHeight - 1);
+
+      for (let column = 0; column < columns; column += 1) {
+        const characterX = asciiX + column * cellWidth + cellWidth * 0.5;
+        const splitLineX = getSplitLineXAtY(split, viewportHeight, characterY);
+        const signedDistance = settings.asciiSide === "right" ? characterX - splitLineX : splitLineX - characterX;
+        let fade = 1;
+        if (softness > 0) {
+          fade = clampNumber((signedDistance + softness) / Math.max(1, softness * 2), 0, 1);
+        } else if (signedDistance < 0) {
+          continue;
+        }
+
+        const sampleX = (characterX / viewportWidth) * (targetWidth - 1);
+        const baseValue = getPixelSampleValue(pixelSampleBuffer, sampleX, sampleY, targetWidth, targetHeight);
+        const edgeBoost = getPixelSampleEdgeBoost(pixelSampleBuffer, sampleX, sampleY, targetWidth, targetHeight, baseValue);
+        const tunedLevel = tuneAsciiValue(clampNumber(baseValue + edgeBoost, 0, 1));
+        const character = getCharacterFromAsciiValue(tunedLevel);
+        if (character === " ") {
+          continue;
+        }
+
+        asciiContext.globalAlpha = fade;
+        asciiContext.fillStyle =
+          tunedLevel > 0.72
+            ? "rgba(255, 207, 90, 0.94)"
+            : tunedLevel > 0.42
+              ? "rgba(87, 213, 255, 0.86)"
+              : "rgba(191, 239, 255, 0.58)";
+        asciiContext.fillText(character, characterX, characterY);
+      }
+    }
+
+    asciiContext.globalAlpha = 1;
+    asciiContext.restore();
+  }
+
+  function disablePixelSampleFallback(error: unknown, time: number, force: boolean) {
+    console.warn("Hero pixel-sample ASCII renderer failed; falling back to edge-projection ASCII.", error);
+    disposePixelSampleTarget();
+    activeRenderMode = "edgeProjection";
+    asciiRuntimeEnabled = settings.ascii.enabled && !(isSmallScreen && settings.ascii.disableOnMobile);
+    container.dataset.renderModeRuntime = "pixelSample-fallback-edgeProjection";
+    container.dataset.pixelSampleRuntime = "fallback-edgeProjection";
+    lastAsciiUpdate = -Infinity;
+    try {
+      renderAsciiLayerUnsafe(time, force);
+    } catch (edgeProjectionError) {
+      disableAsciiFallback(edgeProjectionError);
+    }
+  }
+
   function disableAsciiFallback(error: unknown) {
-    console.warn("Hero ASCII renderer disabled; falling back to normal Three.js render.", error);
+    console.warn("Hero edge-projection ASCII renderer disabled; falling back to normal Three.js render.", error);
     asciiRuntimeEnabled = false;
     shapeAwareRuntimeEnabled = false;
     shapeLookupCache.clear();
     asciiContext?.clearRect(0, 0, container.clientWidth, container.clientHeight);
+    container.dataset.renderModeRuntime = "normalOnly";
     container.dataset.asciiRuntime = "fallback-normal";
     container.dataset.asciiShapeRuntime = "fallback-brightness";
     renderNormalSide();
@@ -1476,12 +1895,20 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
 
   function renderAsciiLayer(time: number, force = false) {
     try {
-      renderAsciiLayerUnsafe(time, force);
+      if (activeRenderMode === "pixelSample") {
+        renderPixelSampleAsciiLayerUnsafe(time, force);
+      } else {
+        renderAsciiLayerUnsafe(time, force);
+      }
       if (asciiRuntimeEnabled) {
         container.dataset.asciiRuntime = "active";
       }
     } catch (error) {
-      disableAsciiFallback(error);
+      if (activeRenderMode === "pixelSample") {
+        disablePixelSampleFallback(error, time, force);
+      } else {
+        disableAsciiFallback(error);
+      }
     }
   }
 
@@ -1593,6 +2020,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       }
 
       disposeModelOverrideResources();
+      disposePixelSampleTarget();
       geometries.forEach((geometry) => geometry.dispose());
       materials.forEach((material) => material.dispose());
       renderer.dispose();
