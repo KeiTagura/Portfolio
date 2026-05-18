@@ -30,6 +30,17 @@ export const site = {
       clampWhenFinished: true,
       timeScale: 1,
     },
+    modelView: {
+      cameraDistance: 7.2,
+      cameraY: 0.55,
+      cameraFov: 38,
+      modelFitSize: 6,
+      position: {
+        x: 1.35,
+        y: 0.05,
+        z: 0,
+      },
+    },
     fallbackImage: "/media/hero/hero-fallback.webp",
     fallbackTint: {
       color: "rgba(87, 213, 255, 0.22)",

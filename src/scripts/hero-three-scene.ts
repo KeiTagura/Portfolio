@@ -48,6 +48,17 @@ type HeroThreeSettings = {
     clampWhenFinished: boolean;
     timeScale: number;
   };
+  modelView: {
+    cameraDistance: number;
+    cameraY: number;
+    cameraFov: number;
+    modelFitSize: number;
+    position: {
+      x: number;
+      y: number;
+      z: number;
+    };
+  };
   asciiSide: "left" | "right";
   splitPosition: number;
   splitAngle: number;
@@ -161,6 +172,17 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
       loop: container.dataset.modelAnimationLoop !== "false",
       clampWhenFinished: container.dataset.modelAnimationClamp !== "false",
       timeScale: clampNumber(parseNumber(container.dataset.modelAnimationTimeScale ?? null, 1), 0.05, 4),
+    },
+    modelView: {
+      cameraDistance: clampNumber(parseNumber(container.dataset.modelViewCameraDistance ?? null, 7.2), 2, 24),
+      cameraY: clampNumber(parseNumber(container.dataset.modelViewCameraY ?? null, 0.55), -6, 6),
+      cameraFov: clampNumber(parseNumber(container.dataset.modelViewCameraFov ?? null, 38), 18, 80),
+      modelFitSize: clampNumber(parseNumber(container.dataset.modelViewFitSize ?? null, 2.8), 0.2, 12),
+      position: {
+        x: clampNumber(parseNumber(container.dataset.modelViewPositionX ?? null, 1.35), -12, 12),
+        y: clampNumber(parseNumber(container.dataset.modelViewPositionY ?? null, 0.05), -12, 12),
+        z: clampNumber(parseNumber(container.dataset.modelViewPositionZ ?? null, 0), -12, 12),
+      },
     },
     asciiSide: container.dataset.asciiSide === "left" ? "left" : "right",
     splitPosition: clampNumber(parseNumber(container.dataset.splitPosition ?? null, 0.5), 0, 1),
@@ -462,11 +484,11 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   container.replaceChildren(...(backgroundTitle ? [backgroundTitle] : []), renderer.domElement, asciiCanvas);
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 120);
-  camera.position.set(0, 0.55, 7.2);
+  const camera = new THREE.PerspectiveCamera(settings.modelView.cameraFov, width / height, 0.1, 120);
+  camera.position.set(0, settings.modelView.cameraY, settings.modelView.cameraDistance);
 
   const root = new THREE.Group();
-  root.position.set(1.35, 0.05, 0);
+  root.position.set(settings.modelView.position.x, settings.modelView.position.y, settings.modelView.position.z);
   scene.add(root);
   const proceduralGroup = new THREE.Group();
   proceduralGroup.name = "Hero procedural fallback";
@@ -888,7 +910,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       const maxDimension = Math.max(size.x, size.y, size.z);
       if (Number.isFinite(maxDimension) && maxDimension > 0) {
         loadedModel.position.sub(center);
-        loadedModel.scale.setScalar(2.8 / maxDimension);
+        loadedModel.scale.setScalar(settings.modelView.modelFitSize / maxDimension);
       }
 
       applyModelMaterialSettings(loadedModel, externalModelTexture);
@@ -1463,7 +1485,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     const float = reduceMotion ? 0 : Math.sin(seconds * 0.75) * 0.075;
     const pulse = reduceMotion ? 1 : 1 + Math.sin(seconds * 1.15) * 0.035;
 
-    root.position.y = 0.05 + float;
+    root.position.y = settings.modelView.position.y + float;
     root.rotation.y = seconds * 0.12 * speed;
     root.rotation.x = -0.08;
     core.rotation.y = seconds * 0.34 * speed;
