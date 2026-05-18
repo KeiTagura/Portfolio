@@ -7,6 +7,7 @@ type HeroThreeController = {
 
 type AsciiSamplePattern = "center" | "grid" | "circle6";
 type AsciiShapeVectorMode = "2d" | "6d";
+type AsciiDensityMode = "fixed-cell" | "fit-width";
 
 type AsciiCharacterVector = {
   character: string;
@@ -66,7 +67,9 @@ type HeroThreeSettings = {
   showSplitLine: boolean;
   ascii: {
     enabled: boolean;
+    densityMode: AsciiDensityMode;
     resolution: number;
+    cellWidth: number;
     updateFPS: number;
     charset: string;
     invert: boolean;
@@ -137,6 +140,10 @@ function readShapeVectorMode(value: string | undefined): AsciiShapeVectorMode {
   return value === "2d" || value === "6d" ? value : "6d";
 }
 
+function readDensityMode(value: string | undefined): AsciiDensityMode {
+  return value === "fit-width" ? "fit-width" : "fixed-cell";
+}
+
 function readModelSource(value: string | undefined): HeroModelSource {
   return value === "url" ? "url" : "procedural";
 }
@@ -191,7 +198,9 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
     showSplitLine: container.dataset.showSplitLine !== "false",
     ascii: {
       enabled: container.dataset.asciiEnabled !== "false",
+      densityMode: readDensityMode(container.dataset.asciiDensityMode),
       resolution: clampNumber(parseInteger(legacyAsciiResolution, 96), 16, 180),
+      cellWidth: clampNumber(parseNumber(container.dataset.asciiCellWidth ?? null, 8), 4, 40),
       updateFPS: clampNumber(parseNumber(container.dataset.asciiUpdateFps ?? null, 30), 1, 60),
       charset: container.dataset.asciiCharset ?? " .:-=+*#%@",
       invert: container.dataset.asciiInvert === "true",
@@ -697,10 +706,28 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   let shapeAwareRuntimeEnabled = settings.ascii.useShapeAwareLookup && shapeCharacterVectors.length > 0 && !isSmallScreen;
   let slowShapeAwareFrames = 0;
   container.dataset.asciiRuntime = asciiRuntimeEnabled ? "active" : "disabled";
+  container.dataset.asciiDensityRuntime = settings.ascii.densityMode;
   container.dataset.asciiEffectiveResolution = String(maxAsciiColumns);
   container.dataset.asciiEffectiveUpdateFps = String(effectiveAsciiUpdateFPS);
   container.dataset.asciiEffectiveSampleCount = String(effectiveAsciiSampleCount);
   container.dataset.asciiShapeRuntime = shapeAwareRuntimeEnabled ? "shape-aware" : "brightness";
+
+  function getAsciiCellMetrics(viewportWidth: number) {
+    if (settings.ascii.densityMode === "fixed-cell") {
+      const mobileSafeWidth = isSmallScreen ? viewportWidth / 64 : 0;
+      const cellWidth = Math.max(settings.ascii.cellWidth, mobileSafeWidth);
+      return {
+        cellWidth,
+        cellHeight: Math.max(settings.ascii.lineHeight, cellWidth * settings.ascii.cellAspect),
+      };
+    }
+
+    const cellWidth = Math.max(6, viewportWidth / Math.max(16, maxAsciiColumns));
+    return {
+      cellWidth,
+      cellHeight: Math.max(settings.ascii.lineHeight, cellWidth * settings.ascii.cellAspect),
+    };
+  }
 
   if (OrbitControlsClass) {
     controls = new OrbitControlsClass(camera, renderer.domElement);
@@ -1280,9 +1307,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       return;
     }
 
-    const fullCellWidth = Math.max(6, viewportWidth / Math.max(16, maxAsciiColumns));
-    const cellWidth = fullCellWidth;
-    const cellHeight = Math.max(settings.ascii.lineHeight, fullCellWidth * settings.ascii.cellAspect);
+    const { cellWidth, cellHeight } = getAsciiCellMetrics(viewportWidth);
     const columns = Math.max(1, Math.floor(asciiWidth / cellWidth));
     const rows = Math.max(1, Math.floor(viewportHeight / cellHeight));
     const cells = Array.from({ length: columns * rows }, () => " ");
