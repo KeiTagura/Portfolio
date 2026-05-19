@@ -13,6 +13,7 @@ type HeroDebugGuiController = {
 type AsciiSamplePattern = "center" | "grid" | "circle6";
 type AsciiShapeVectorMode = "2d" | "6d";
 type AsciiDensityMode = "fixed-cell" | "fit-width";
+type AsciiColorSamplingMode = "center" | "average" | "dominant";
 
 type AsciiCharacterVector = {
   character: string;
@@ -33,6 +34,26 @@ type AsciiSurfaceSource = {
   geometry: BufferGeometry;
   object: Object3D;
 };
+
+type RgbaColor = {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+};
+
+const CENTER_COLOR_SAMPLE_OFFSETS = [{ x: 0, y: 0 }] as const;
+const AVERAGE_COLOR_SAMPLE_OFFSETS = [
+  { x: -0.45, y: -0.45 },
+  { x: 0, y: -0.45 },
+  { x: 0.45, y: -0.45 },
+  { x: -0.45, y: 0 },
+  { x: 0, y: 0 },
+  { x: 0.45, y: 0 },
+  { x: -0.45, y: 0.45 },
+  { x: 0, y: 0.45 },
+  { x: 0.45, y: 0.45 },
+] as const;
 
 type TextureBackedMaterial = Material & {
   alphaTest?: number;
@@ -127,6 +148,19 @@ type HeroThreeSettings = {
     normalLightingStrength: number;
     edgeDominance: number;
     pixelSampleDisableOnMobile: boolean;
+    colorSampling: {
+      enabled: boolean;
+      mode: AsciiColorSamplingMode;
+      strength: number;
+      saturation: number;
+      brightness: number;
+      contrast: number;
+      alpha: number;
+      grayscaleFallback: boolean;
+      sampleBackground: boolean;
+      minAlpha: number;
+      disableOnMobile: boolean;
+    };
     cellAspect: number;
     fontSize: number;
     lineHeight: number;
@@ -189,6 +223,10 @@ function readShapeVectorMode(value: string | undefined): AsciiShapeVectorMode {
 
 function readDensityMode(value: string | undefined): AsciiDensityMode {
   return value === "fit-width" ? "fit-width" : "fixed-cell";
+}
+
+function readColorSamplingMode(value: string | undefined): AsciiColorSamplingMode {
+  return value === "center" || value === "dominant" || value === "average" ? value : "average";
 }
 
 function readRenderMode(value: string | undefined): HeroRenderMode {
@@ -298,6 +336,19 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
       normalLightingStrength: clampNumber(parseNumber(container.dataset.asciiNormalLightingStrength ?? null, 0.5), 0, 2),
       edgeDominance: clampNumber(parseNumber(container.dataset.asciiEdgeDominance ?? null, 0.8), 0, 2),
       pixelSampleDisableOnMobile: container.dataset.asciiPixelSampleDisableOnMobile === "true",
+      colorSampling: {
+        enabled: container.dataset.asciiColorSamplingEnabled === "true",
+        mode: readColorSamplingMode(container.dataset.asciiColorSamplingMode),
+        strength: clampNumber(parseNumber(container.dataset.asciiColorSamplingStrength ?? null, 1), 0, 1),
+        saturation: clampNumber(parseNumber(container.dataset.asciiColorSamplingSaturation ?? null, 1), 0, 4),
+        brightness: clampNumber(parseNumber(container.dataset.asciiColorSamplingBrightness ?? null, 1), 0, 4),
+        contrast: clampNumber(parseNumber(container.dataset.asciiColorSamplingContrast ?? null, 1), 0, 4),
+        alpha: clampNumber(parseNumber(container.dataset.asciiColorSamplingAlpha ?? null, 1), 0, 1),
+        grayscaleFallback: container.dataset.asciiColorSamplingGrayscaleFallback === "true",
+        sampleBackground: container.dataset.asciiColorSamplingSampleBackground === "true",
+        minAlpha: clampNumber(parseNumber(container.dataset.asciiColorSamplingMinAlpha ?? null, 0.05), 0, 1),
+        disableOnMobile: container.dataset.asciiColorSamplingDisableOnMobile === "true",
+      },
       cellAspect: clampNumber(parseNumber(container.dataset.asciiCellAspect ?? null, 1.8), 0.5, 3),
       fontSize: clampNumber(parseNumber(container.dataset.asciiFontSize ?? null, 10), 4, 32),
       lineHeight: clampNumber(parseNumber(container.dataset.asciiLineHeight ?? null, 10), 4, 40),
@@ -907,6 +958,10 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   ].join("|");
   let hasAngledSplit = Math.abs(splitAngleRadians) > 0.001;
   let shapeAwareRuntimeEnabled = settings.ascii.useShapeAwareLookup && shapeCharacterVectors.length > 0 && !isSmallScreen;
+  let pixelSampleColorSamplingRuntimeEnabled =
+    settings.renderMode === "pixelSample" &&
+    settings.ascii.colorSampling.enabled &&
+    !(isSmallScreen && settings.ascii.colorSampling.disableOnMobile);
   let slowShapeAwareFrames = 0;
   container.dataset.asciiRuntime = asciiRuntimeEnabled ? "active" : "disabled";
   if (settings.renderMode === "pixelSample") {
@@ -917,6 +972,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   container.dataset.asciiEffectiveUpdateFps = String(effectiveAsciiUpdateFPS);
   container.dataset.asciiEffectiveSampleCount = String(effectiveAsciiSampleCount);
   container.dataset.asciiShapeRuntime = shapeAwareRuntimeEnabled ? "shape-aware" : "brightness";
+  container.dataset.pixelSampleColorRuntime = pixelSampleColorSamplingRuntimeEnabled ? "active" : "disabled";
 
   function refreshAsciiRuntimeCache(config = settings) {
     effectiveAsciiUpdateFPS = isSmallScreen ? Math.min(config.ascii.updateFPS, 15) : config.ascii.updateFPS;
@@ -925,6 +981,10 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     effectiveAsciiSampleCount = isSmallScreen ? Math.min(config.ascii.sampleCount, 2) : config.ascii.sampleCount;
     asciiSampleOffsets = getAsciiSampleOffsets(config.ascii.samplePattern, effectiveAsciiSampleCount);
     asciiCharacters = normalizeCharset(config.ascii.charset);
+    pixelSampleColorSamplingRuntimeEnabled =
+      config.renderMode === "pixelSample" &&
+      config.ascii.colorSampling.enabled &&
+      !(isSmallScreen && config.ascii.colorSampling.disableOnMobile);
 
     const nextShapeResourceConfigKey = [
       config.ascii.charset,
@@ -960,6 +1020,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     container.dataset.asciiEffectiveUpdateFps = String(effectiveAsciiUpdateFPS);
     container.dataset.asciiEffectiveSampleCount = String(effectiveAsciiSampleCount);
     container.dataset.asciiShapeRuntime = shapeAwareRuntimeEnabled ? "shape-aware" : "brightness";
+    container.dataset.pixelSampleColorRuntime = pixelSampleColorSamplingRuntimeEnabled ? "active" : "disabled";
     lastAsciiUpdate = -Infinity;
   }
 
@@ -1372,6 +1433,44 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     return asciiCharacters[index] ?? " ";
   }
 
+  function setAsciiRampColor(value: number, target: RgbaColor): RgbaColor {
+    if (value > 0.72) {
+      target.r = 255;
+      target.g = 207;
+      target.b = 90;
+      target.a = 0.94;
+      return target;
+    }
+
+    if (value > 0.42) {
+      target.r = 87;
+      target.g = 213;
+      target.b = 255;
+      target.a = 0.86;
+      return target;
+    }
+
+    target.r = 191;
+    target.g = 239;
+    target.b = 255;
+    target.a = 0.58;
+    return target;
+  }
+
+  function formatRgba(color: RgbaColor) {
+    return `rgba(${Math.round(clampNumber(color.r, 0, 255))}, ${Math.round(clampNumber(color.g, 0, 255))}, ${Math.round(clampNumber(color.b, 0, 255))}, ${clampNumber(color.a, 0, 1)})`;
+  }
+
+  function mixColorsTo(a: RgbaColor, b: RgbaColor, amount: number, target: RgbaColor): RgbaColor {
+    const t = clampNumber(amount, 0, 1);
+
+    target.r = a.r + (b.r - a.r) * t;
+    target.g = a.g + (b.g - a.g) * t;
+    target.b = a.b + (b.b - a.b) * t;
+    target.a = a.a + (b.a - a.a) * t;
+    return target;
+  }
+
   function getPixelSampleValue(buffer: Uint8Array, x: number, y: number, width: number, height: number) {
     const clampedX = clampNumber(Math.round(x), 0, width - 1);
     const clampedY = clampNumber(Math.round(y), 0, height - 1);
@@ -1382,6 +1481,128 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     const blue = buffer[index + 2] / 255;
     const alpha = buffer[index + 3] / 255;
     return (red * 0.2126 + green * 0.7152 + blue * 0.0722) * alpha;
+  }
+
+  function getPixelColorAt(
+    buffer: Uint8Array,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    target: RgbaColor,
+  ): RgbaColor {
+    const clampedX = clampNumber(Math.round(x), 0, width - 1);
+    const clampedY = clampNumber(Math.round(y), 0, height - 1);
+    const flippedY = height - 1 - clampedY;
+    const index = (flippedY * width + clampedX) * 4;
+
+    target.r = buffer[index] / 255;
+    target.g = buffer[index + 1] / 255;
+    target.b = buffer[index + 2] / 255;
+    target.a = buffer[index + 3] / 255;
+    return target;
+  }
+
+  function tuneSampledColorTo(color: RgbaColor, target: RgbaColor): RgbaColor {
+    const luminance = color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722;
+    const saturation = settings.ascii.colorSampling.grayscaleFallback ? 0 : settings.ascii.colorSampling.saturation;
+    const tuneChannel = (channel: number) => {
+      const saturated = luminance + (channel - luminance) * saturation;
+      const contrasted = (saturated - 0.5) * settings.ascii.colorSampling.contrast + 0.5;
+      return clampNumber(contrasted * settings.ascii.colorSampling.brightness, 0, 1);
+    };
+
+    target.r = tuneChannel(color.r) * 255;
+    target.g = tuneChannel(color.g) * 255;
+    target.b = tuneChannel(color.b) * 255;
+    target.a = clampNumber(color.a, 0, 1);
+    return target;
+  }
+
+  function getPixelSampleColorTo(
+    buffer: Uint8Array,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    sampleWidth: number,
+    sampleHeight: number,
+    target: RgbaColor,
+    sampleScratch: RgbaColor,
+  ) {
+    const colorSampling = settings.ascii.colorSampling;
+    const offsets =
+      colorSampling.mode === "center"
+        ? CENTER_COLOR_SAMPLE_OFFSETS
+        : AVERAGE_COLOR_SAMPLE_OFFSETS;
+
+    let red = 0;
+    let green = 0;
+    let blue = 0;
+    let alpha = 0;
+    let samples = 0;
+
+    for (const offset of offsets) {
+      const sample = getPixelColorAt(buffer, x + offset.x * sampleWidth, y + offset.y * sampleHeight, width, height, sampleScratch);
+      if (!colorSampling.sampleBackground && sample.a < colorSampling.minAlpha) {
+        continue;
+      }
+
+      const weight = colorSampling.sampleBackground ? 1 : Math.max(sample.a, colorSampling.minAlpha);
+      red += sample.r * weight;
+      green += sample.g * weight;
+      blue += sample.b * weight;
+      alpha += sample.a;
+      samples += weight;
+    }
+
+    if (samples <= 0) {
+      return false;
+    }
+
+    target.r = red / samples;
+    target.g = green / samples;
+    target.b = blue / samples;
+    target.a = alpha / offsets.length;
+
+    tuneSampledColorTo(target, target);
+    return true;
+  }
+
+  function getPixelSampleAsciiColorTo(
+    buffer: Uint8Array,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    sampleWidth: number,
+    sampleHeight: number,
+    baseColor: RgbaColor,
+    target: RgbaColor,
+    sampledColor: RgbaColor,
+    sampleScratch: RgbaColor,
+  ) {
+    if (!pixelSampleColorSamplingRuntimeEnabled) {
+      target.r = baseColor.r;
+      target.g = baseColor.g;
+      target.b = baseColor.b;
+      target.a = baseColor.a;
+      return target;
+    }
+
+    const colorSampling = settings.ascii.colorSampling;
+    const hasSample = getPixelSampleColorTo(buffer, x, y, width, height, sampleWidth, sampleHeight, sampledColor, sampleScratch);
+    if (!hasSample) {
+      target.r = baseColor.r;
+      target.g = baseColor.g;
+      target.b = baseColor.b;
+      target.a = baseColor.a;
+      return target;
+    }
+
+    mixColorsTo(baseColor, sampledColor, colorSampling.strength, target);
+    target.a = baseColor.a * colorSampling.alpha;
+    return target;
   }
 
   function getPixelSampleEdgeBoost(buffer: Uint8Array, x: number, y: number, width: number, height: number, value: number) {
@@ -1887,6 +2108,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     asciiContext.textAlign = "center";
     asciiContext.shadowColor = "rgba(87, 213, 255, 0.35)";
     asciiContext.shadowBlur = 7;
+    const rampColor: RgbaColor = { r: 0, g: 0, b: 0, a: 1 };
 
     for (let row = 0; row < rows; row += 1) {
       for (let column = 0; column < columns; column += 1) {
@@ -1915,12 +2137,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
                 settings.ascii.maxCacheEntries,
               ) || character
             : getCharacterFromAsciiValue(tunedLevel);
-        asciiContext.fillStyle =
-          tunedLevel > 0.72
-            ? "rgba(255, 207, 90, 0.94)"
-            : tunedLevel > 0.42
-              ? "rgba(87, 213, 255, 0.86)"
-              : "rgba(191, 239, 255, 0.58)";
+        asciiContext.fillStyle = formatRgba(setAsciiRampColor(tunedLevel, rampColor));
         const characterX = asciiX + column * cellWidth + cellWidth * 0.5;
         const characterY = row * cellHeight + cellHeight * 0.55;
         const splitLineX = getSplitLineXAtY(split, viewportHeight, characterY);
@@ -2008,6 +2225,8 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     const fullColumns = Math.max(1, Math.ceil(viewportWidth / cellWidth));
     const targetWidth = Math.max(16, Math.min(isSmallScreen ? 96 : 220, fullColumns));
     const targetHeight = Math.max(12, Math.min(isSmallScreen ? 80 : 140, rows));
+    const targetSampleWidth = targetWidth / Math.max(1, fullColumns);
+    const targetSampleHeight = targetHeight / Math.max(1, rows);
 
     ensurePixelSampleTarget(targetWidth, targetHeight);
     if (!pixelSampleTarget || !pixelSampleBuffer) {
@@ -2048,6 +2267,10 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     asciiContext.textAlign = "center";
     asciiContext.shadowColor = "rgba(87, 213, 255, 0.28)";
     asciiContext.shadowBlur = 5;
+    const baseColor: RgbaColor = { r: 0, g: 0, b: 0, a: 1 };
+    const characterColor: RgbaColor = { r: 0, g: 0, b: 0, a: 1 };
+    const sampledColor: RgbaColor = { r: 0, g: 0, b: 0, a: 1 };
+    const sampleScratch: RgbaColor = { r: 0, g: 0, b: 0, a: 1 };
 
     for (let row = 0; row < rows; row += 1) {
       const characterY = row * cellHeight + cellHeight * 0.55;
@@ -2073,13 +2296,35 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
           continue;
         }
 
+        setAsciiRampColor(tunedLevel, baseColor);
+        characterColor.r = baseColor.r;
+        characterColor.g = baseColor.g;
+        characterColor.b = baseColor.b;
+        characterColor.a = baseColor.a;
+        if (pixelSampleColorSamplingRuntimeEnabled) {
+          try {
+            getPixelSampleAsciiColorTo(
+              pixelSampleBuffer,
+              sampleX,
+              sampleY,
+              targetWidth,
+              targetHeight,
+              targetSampleWidth,
+              targetSampleHeight,
+              baseColor,
+              characterColor,
+              sampledColor,
+              sampleScratch,
+            );
+          } catch (error) {
+            pixelSampleColorSamplingRuntimeEnabled = false;
+            container.dataset.pixelSampleColorRuntime = "fallback-uncolored";
+            console.warn("Hero pixel-sample color sampling failed; continuing with uncolored pixel-sample ASCII.", error);
+          }
+        }
+
         asciiContext.globalAlpha = fade;
-        asciiContext.fillStyle =
-          tunedLevel > 0.72
-            ? "rgba(255, 207, 90, 0.94)"
-            : tunedLevel > 0.42
-              ? "rgba(87, 213, 255, 0.86)"
-              : "rgba(191, 239, 255, 0.58)";
+        asciiContext.fillStyle = formatRgba(characterColor);
         asciiContext.fillText(character, characterX, characterY);
       }
     }
@@ -2226,6 +2471,10 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       activeRenderMode !== "normalOnly" &&
       config.ascii.enabled &&
       !(isSmallScreen && config.ascii.disableOnMobile);
+    pixelSampleColorSamplingRuntimeEnabled =
+      activeRenderMode === "pixelSample" &&
+      config.ascii.colorSampling.enabled &&
+      !(isSmallScreen && config.ascii.colorSampling.disableOnMobile);
 
     if (activeRenderMode !== "pixelSample") {
       disposePixelSampleTarget();
@@ -2253,6 +2502,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
           ? "pixelSample-disabled-mobile-edgeProjection"
           : activeRenderMode;
     container.dataset.asciiRuntime = asciiRuntimeEnabled ? "active" : "disabled";
+    container.dataset.pixelSampleColorRuntime = pixelSampleColorSamplingRuntimeEnabled ? "active" : "disabled";
 
     if (!asciiRuntimeEnabled) {
       asciiContext?.clearRect(0, 0, container.clientWidth, container.clientHeight);

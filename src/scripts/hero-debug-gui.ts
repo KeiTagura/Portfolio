@@ -53,6 +53,19 @@ type HeroDebugConfigShape = {
     useNormalLighting: boolean;
     normalLightingStrength: number;
     edgeDominance: number;
+    colorSampling: {
+      enabled: boolean;
+      mode: "center" | "average" | "dominant";
+      strength: number;
+      saturation: number;
+      brightness: number;
+      contrast: number;
+      alpha: number;
+      grayscaleFallback: boolean;
+      sampleBackground: boolean;
+      minAlpha: number;
+      disableOnMobile: boolean;
+    };
     cellAspect: number;
     fontSize: number;
     lineHeight: number;
@@ -411,6 +424,32 @@ function addAsciiSamplingShapeLookupFolder<Config extends PlainConfig>(
   return folder;
 }
 
+function addAsciiColorSamplingFolder<Config extends PlainConfig>(
+  gui: GUI,
+  config: Config,
+  applyAsciiSettings: () => void,
+) {
+  const heroConfig = config as Config & HeroDebugConfigShape;
+  const folder = gui.addFolder("ASCII Color Sampling");
+
+  folder.add(heroConfig.ascii.colorSampling, "enabled").name("enabled (pixelSample only)").onChange(applyAsciiSettings);
+  folder
+    .add(heroConfig.ascii.colorSampling, "mode", ["center", "average", "dominant"])
+    .name("mode")
+    .onChange(applyAsciiSettings);
+  folder.add(heroConfig.ascii.colorSampling, "strength", 0, 1, 0.01).name("strength").onChange(applyAsciiSettings);
+  folder.add(heroConfig.ascii.colorSampling, "saturation", 0, 3, 0.01).name("saturation").onChange(applyAsciiSettings);
+  folder.add(heroConfig.ascii.colorSampling, "brightness", 0, 3, 0.01).name("brightness").onChange(applyAsciiSettings);
+  folder.add(heroConfig.ascii.colorSampling, "contrast", 0, 3, 0.01).name("contrast").onChange(applyAsciiSettings);
+  folder.add(heroConfig.ascii.colorSampling, "alpha", 0, 1, 0.01).name("alpha").onChange(applyAsciiSettings);
+  folder.add(heroConfig.ascii.colorSampling, "grayscaleFallback").name("grayscaleFallback").onChange(applyAsciiSettings);
+  folder.add(heroConfig.ascii.colorSampling, "sampleBackground").name("sampleBackground").onChange(applyAsciiSettings);
+  folder.add(heroConfig.ascii.colorSampling, "minAlpha", 0, 1, 0.01).name("minAlpha").onChange(applyAsciiSettings);
+  folder.add(heroConfig.ascii.colorSampling, "disableOnMobile").name("disableOnMobile").onChange(applyAsciiSettings);
+
+  return folder;
+}
+
 function addBackgroundTitleFolder<Config extends PlainConfig>(
   gui: GUI,
   config: Config,
@@ -552,6 +591,7 @@ export function createHeroDebugGui<Config extends PlainConfig>({
   addAsciiCoreFolder(gui, config, scheduleAsciiApply);
   addAsciiSurfaceShadingFolder(gui, config, scheduleAsciiApply);
   addAsciiSamplingShapeLookupFolder(gui, config, scheduleAsciiApply);
+  addAsciiColorSamplingFolder(gui, config, scheduleAsciiApply);
   addBackgroundTitleFolder(gui, config, callbacks);
   addOverlayFallbackFolder(gui, config, callbacks);
   addUtilityFolder(gui, {
