@@ -5,6 +5,11 @@ type HeroThreeController = {
   destroy: () => void;
 };
 
+type HeroDebugGuiController = {
+  destroy: () => void;
+  dispose?: () => void;
+};
+
 type AsciiSamplePattern = "center" | "grid" | "circle6";
 type AsciiShapeVectorMode = "2d" | "6d";
 type AsciiDensityMode = "fixed-cell" | "fit-width";
@@ -42,8 +47,34 @@ type TextureBackedMaterial = Material & {
 };
 
 type HeroThreeSettings = {
+  enabled: boolean;
   mode: string;
   renderMode: HeroRenderMode;
+  debugGui: {
+    enabled: boolean;
+    showInProduction: boolean;
+    startOpen: boolean;
+    width: number;
+    enableWithQueryParam: boolean;
+  };
+  backgroundTitle: {
+    enabled: boolean;
+    text: string;
+    normalColor: string;
+    asciiColor: string;
+    opacity: number;
+    fontSize: string;
+    x: string;
+    y: string;
+  };
+  mediaOverlay: {
+    visible: boolean;
+    opacity: number;
+  };
+  fallbackTint: {
+    color: string;
+    blendMode: string;
+  };
   modelSource: HeroModelSource;
   modelUrl: string;
   modelMaterialMode: HeroModelMaterialMode;
@@ -187,8 +218,34 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
   const maxPolarAngle = clampNumber(parseNumber(container.dataset.orbitMaxPolarAngle ?? null, 2.05), 0, Math.PI);
 
   return {
+    enabled: container.dataset.enabled !== "false",
     mode: container.dataset.mode ?? "three-ascii-split",
     renderMode: readRenderMode(container.dataset.renderMode),
+    debugGui: {
+      enabled: container.dataset.debugGuiEnabled === "true",
+      showInProduction: container.dataset.debugGuiShowInProduction === "true",
+      startOpen: container.dataset.debugGuiStartOpen !== "false",
+      width: clampNumber(parseNumber(container.dataset.debugGuiWidth ?? null, 360), 220, 640),
+      enableWithQueryParam: container.dataset.debugGuiEnableWithQueryParam !== "false",
+    },
+    backgroundTitle: {
+      enabled: container.dataset.backgroundTitleEnabled === "true",
+      text: container.dataset.backgroundTitleText ?? "",
+      normalColor: container.dataset.backgroundTitleNormalColor ?? "rgba(244, 247, 251, 0.09)",
+      asciiColor: container.dataset.backgroundTitleAsciiColor ?? "rgba(87, 213, 255, 0.18)",
+      opacity: clampNumber(parseNumber(container.dataset.backgroundTitleOpacity ?? null, 1), 0, 1),
+      fontSize: container.dataset.backgroundTitleFontSize ?? "clamp(5rem, 16vw, 13rem)",
+      x: container.dataset.backgroundTitleX ?? "0%",
+      y: container.dataset.backgroundTitleY ?? "0%",
+    },
+    mediaOverlay: {
+      visible: container.dataset.mediaOverlayVisible !== "false",
+      opacity: clampNumber(parseNumber(container.dataset.mediaOverlayOpacity ?? null, 1), 0, 1),
+    },
+    fallbackTint: {
+      color: container.dataset.fallbackTintColor ?? "rgba(87, 213, 255, 0.22)",
+      blendMode: container.dataset.fallbackTintBlendMode ?? "multiply",
+    },
     modelSource: readModelSource(container.dataset.modelSource),
     modelUrl: container.dataset.modelUrl ?? "",
     modelMaterialMode: readModelMaterialMode(container.dataset.modelMaterialMode),
@@ -220,35 +277,35 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
     ascii: {
       enabled: container.dataset.asciiEnabled !== "false",
       densityMode: readDensityMode(container.dataset.asciiDensityMode),
-      resolution: clampNumber(parseInteger(legacyAsciiResolution, 96), 16, 180),
-      cellWidth: clampNumber(parseNumber(container.dataset.asciiCellWidth ?? null, 8), 4, 40),
+      resolution: clampNumber(parseInteger(legacyAsciiResolution, 96), 20, 400),
+      cellWidth: clampNumber(parseNumber(container.dataset.asciiCellWidth ?? null, 8), 2, 24),
       updateFPS: clampNumber(parseNumber(container.dataset.asciiUpdateFps ?? null, 30), 1, 60),
       charset: container.dataset.asciiCharset ?? " .:-=+*#%@",
       invert: container.dataset.asciiInvert === "true",
-      sampleCount: clampNumber(parseInteger(container.dataset.asciiSampleCount ?? null, 4), 1, 8),
+      sampleCount: clampNumber(parseInteger(container.dataset.asciiSampleCount ?? null, 4), 1, 16),
       samplePattern: readSamplePattern(container.dataset.asciiSamplePattern),
-      contrast: clampNumber(parseNumber(container.dataset.asciiContrast ?? null, 1.4), 0.2, 4),
-      brightness: clampNumber(parseNumber(container.dataset.asciiBrightness ?? null, 1), 0, 3),
-      gamma: clampNumber(parseNumber(container.dataset.asciiGamma ?? null, 1), 0.2, 3),
+      contrast: clampNumber(parseNumber(container.dataset.asciiContrast ?? null, 1.4), 0.1, 4),
+      brightness: clampNumber(parseNumber(container.dataset.asciiBrightness ?? null, 1), 0.1, 4),
+      gamma: clampNumber(parseNumber(container.dataset.asciiGamma ?? null, 1), 0.1, 4),
       edgeBoost: clampNumber(parseNumber(container.dataset.asciiEdgeBoost ?? null, 0.35), 0, 2),
       edgeThreshold: clampNumber(parseNumber(container.dataset.asciiEdgeThreshold ?? null, 0.2), 0, 1),
       surfaceFill: container.dataset.asciiSurfaceFill === "true",
-      surfaceFillStrength: clampNumber(parseNumber(container.dataset.asciiSurfaceFillStrength ?? null, 0.35), 0, 1),
+      surfaceFillStrength: clampNumber(parseNumber(container.dataset.asciiSurfaceFillStrength ?? null, 0.35), 0, 2),
       surfacePointDensity: clampNumber(parseNumber(container.dataset.asciiSurfacePointDensity ?? null, 0.25), 0, 1),
       useDepthForBrightness: container.dataset.asciiDepthBrightness === "true",
-      depthBrightnessStrength: clampNumber(parseNumber(container.dataset.asciiDepthBrightnessStrength ?? null, 0.45), 0, 1),
+      depthBrightnessStrength: clampNumber(parseNumber(container.dataset.asciiDepthBrightnessStrength ?? null, 0.45), 0, 2),
       useNormalLighting: container.dataset.asciiNormalLighting === "true",
-      normalLightingStrength: clampNumber(parseNumber(container.dataset.asciiNormalLightingStrength ?? null, 0.5), 0, 1),
-      edgeDominance: clampNumber(parseNumber(container.dataset.asciiEdgeDominance ?? null, 0.8), 0, 1),
+      normalLightingStrength: clampNumber(parseNumber(container.dataset.asciiNormalLightingStrength ?? null, 0.5), 0, 2),
+      edgeDominance: clampNumber(parseNumber(container.dataset.asciiEdgeDominance ?? null, 0.8), 0, 2),
       pixelSampleDisableOnMobile: container.dataset.asciiPixelSampleDisableOnMobile === "true",
-      cellAspect: clampNumber(parseNumber(container.dataset.asciiCellAspect ?? null, 1.8), 0.8, 3),
-      fontSize: clampNumber(parseNumber(container.dataset.asciiFontSize ?? null, 10), 6, 24),
-      lineHeight: clampNumber(parseNumber(container.dataset.asciiLineHeight ?? null, 10), 6, 32),
+      cellAspect: clampNumber(parseNumber(container.dataset.asciiCellAspect ?? null, 1.8), 0.5, 3),
+      fontSize: clampNumber(parseNumber(container.dataset.asciiFontSize ?? null, 10), 4, 32),
+      lineHeight: clampNumber(parseNumber(container.dataset.asciiLineHeight ?? null, 10), 4, 40),
       useShapeAwareLookup: container.dataset.asciiShapeAwareLookup === "true",
       shapeVectorMode: readShapeVectorMode(container.dataset.asciiShapeVectorMode),
       useCachedLookup: container.dataset.asciiCachedLookup !== "false",
       lookupQuantization: clampNumber(parseInteger(container.dataset.asciiLookupQuantization ?? null, 8), 2, 32),
-      maxCacheEntries: clampNumber(parseInteger(container.dataset.asciiMaxCacheEntries ?? null, 10000), 0, 50000),
+      maxCacheEntries: clampNumber(parseInteger(container.dataset.asciiMaxCacheEntries ?? null, 10000), 1000, 100000),
       disableOnMobile: container.dataset.asciiDisableOnMobile === "true",
     },
     enableOrbitControls: container.dataset.orbitControls === "true",
@@ -291,7 +348,7 @@ function getAsciiSampleOffsets(pattern: AsciiSamplePattern, sampleCount: number)
   }
 
   if (pattern === "circle6") {
-    return [
+    const offsets = [
       { x: 0, y: 0 },
       { x: 0.34, y: 0 },
       { x: 0.17, y: 0.29 },
@@ -299,10 +356,18 @@ function getAsciiSampleOffsets(pattern: AsciiSamplePattern, sampleCount: number)
       { x: -0.34, y: 0 },
       { x: -0.17, y: -0.29 },
       { x: 0.17, y: -0.29 },
-    ].slice(0, sampleCount);
+    ];
+
+    for (let index = offsets.length; index < sampleCount; index += 1) {
+      const angle = ((index - 1) / Math.max(1, sampleCount - 1)) * Math.PI * 2;
+      const radius = index % 2 === 0 ? 0.44 : 0.22;
+      offsets.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
+    }
+
+    return offsets.slice(0, sampleCount);
   }
 
-  return [
+  const offsets = [
     { x: -0.24, y: -0.24 },
     { x: 0.24, y: -0.24 },
     { x: -0.24, y: 0.24 },
@@ -311,7 +376,20 @@ function getAsciiSampleOffsets(pattern: AsciiSamplePattern, sampleCount: number)
     { x: -0.36, y: 0 },
     { x: 0.36, y: 0 },
     { x: 0, y: -0.36 },
-  ].slice(0, sampleCount);
+  ];
+
+  for (let index = offsets.length; index < sampleCount; index += 1) {
+    const columnCount = Math.ceil(Math.sqrt(sampleCount));
+    const rowCount = Math.ceil(sampleCount / columnCount);
+    const column = index % columnCount;
+    const row = Math.floor(index / columnCount);
+    offsets.push({
+      x: columnCount <= 1 ? 0 : column / (columnCount - 1) - 0.5,
+      y: rowCount <= 1 ? 0 : row / (rowCount - 1) - 0.5,
+    });
+  }
+
+  return offsets.slice(0, sampleCount);
 }
 
 function getShapeVectorSize(mode: AsciiShapeVectorMode) {
@@ -468,11 +546,72 @@ function disposeTexture(texture: Texture | null) {
   texture?.dispose();
 }
 
+function getHeroDebugGuiRequest(settings: HeroThreeSettings) {
+  const queryEnabled =
+    settings.debugGui.enableWithQueryParam && new URLSearchParams(window.location.search).get("heroGui") === "1";
+  const requested = settings.debugGui.enabled || queryEnabled;
+  const productionBlocked = import.meta.env.PROD && !settings.debugGui.showInProduction;
+
+  return {
+    requested,
+    productionBlocked,
+    allowed: requested && !productionBlocked,
+  };
+}
+
+async function loadHeroDebugGui(
+  settings: HeroThreeSettings,
+  container: HTMLElement,
+  callbacks: {
+    applyRenderMode: (config: HeroThreeSettings) => void;
+    applySplitSettings: (config: HeroThreeSettings) => void;
+    applyModelView: (config: HeroThreeSettings) => void;
+    applyOrbitSettings: (config: HeroThreeSettings) => void;
+    applyAsciiSettings: (config: HeroThreeSettings) => void;
+    applyBackgroundTitleSettings: (config: HeroThreeSettings) => void;
+    applyOverlaySettings: (config: HeroThreeSettings) => void;
+    resetToDefaults: (config: HeroThreeSettings) => void;
+  },
+): Promise<HeroDebugGuiController | null> {
+  const debugGuiRequest = getHeroDebugGuiRequest(settings);
+
+  container.dataset.debugGuiRuntime = debugGuiRequest.allowed ? "loading" : "disabled";
+
+  if (!debugGuiRequest.allowed) {
+    if (debugGuiRequest.productionBlocked && debugGuiRequest.requested) {
+      container.dataset.debugGuiRuntime = "blocked-production";
+    }
+    return null;
+  }
+
+  try {
+    const { createHeroDebugGui, deepClonePlainConfig } = await import("./hero-debug-gui");
+    const defaults = deepClonePlainConfig(settings);
+    const controller = createHeroDebugGui({
+      config: settings,
+      defaults,
+      callbacks,
+      options: {
+        startOpen: settings.debugGui.startOpen,
+        width: settings.debugGui.width,
+      },
+    });
+
+    container.dataset.debugGuiRuntime = "active";
+    return controller;
+  } catch (error) {
+    console.warn("Hero debug GUI failed to load.", error);
+    container.dataset.debugGuiRuntime = "failed";
+    return null;
+  }
+}
+
 async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeController | null> {
   const settings = readSettings(container);
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const isSmallScreen = window.matchMedia("(max-width: 720px)").matches;
   const orbitEnabled = settings.enableOrbitControls && !(isSmallScreen && settings.orbit.disableOnMobile);
+  const debugGuiRequested = getHeroDebugGuiRequest(settings).allowed;
   const requestedRenderMode =
     settings.renderMode === "pixelSample" && isSmallScreen && settings.ascii.pixelSampleDisableOnMobile
       ? "edgeProjection"
@@ -492,7 +631,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   }
 
   const THREE = await import("three");
-  const OrbitControlsClass = orbitEnabled
+  const OrbitControlsClass = orbitEnabled || debugGuiRequested
     ? (await import("three/addons/controls/OrbitControls.js")).OrbitControls
     : null;
   const GLTFLoaderClass =
@@ -520,18 +659,18 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   asciiCanvas.className = "hero-ascii-canvas";
   asciiCanvas.setAttribute("aria-hidden", "true");
   const asciiContext = asciiCanvas.getContext("2d", { alpha: true });
-  const backgroundTitle =
-    container.dataset.backgroundTitleEnabled === "true" && container.dataset.backgroundTitleText
-      ? document.createElement("div")
-      : null;
+  let backgroundTitle = settings.backgroundTitle.enabled && settings.backgroundTitle.text
+    ? document.createElement("div")
+    : null;
 
   if (backgroundTitle) {
     backgroundTitle.className = "hero-background-title";
-    backgroundTitle.textContent = container.dataset.backgroundTitleText ?? "";
+    backgroundTitle.textContent = settings.backgroundTitle.text;
     backgroundTitle.setAttribute("aria-hidden", "true");
   }
 
   container.replaceChildren(...(backgroundTitle ? [backgroundTitle] : []), renderer.domElement, asciiCanvas);
+  const visualRoot = container.closest<HTMLElement>("[data-hero-visual]");
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(settings.modelView.cameraFov, width / height, 0.1, 120);
@@ -543,11 +682,12 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   const proceduralGroup = new THREE.Group();
   proceduralGroup.name = "Hero procedural fallback";
   root.add(proceduralGroup);
+  const proceduralBaseFitSize = settings.modelView.modelFitSize;
 
   let controls: OrbitControls | null = null;
   let resumeAutoRotateTimer = 0;
-  const autoRotateEnabled = settings.orbit.autoRotate && !reduceMotion;
-  container.dataset.orbitAutoRotateRuntime = autoRotateEnabled ? "enabled" : "disabled";
+  let autoRotateRuntimeEnabled = settings.orbit.autoRotate && !reduceMotion;
+  container.dataset.orbitAutoRotateRuntime = autoRotateRuntimeEnabled ? "enabled" : "disabled";
 
   function renderCameraChange() {
     if (!reduceMotion && !paused) {
@@ -559,7 +699,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   }
 
   function handleOrbitStart() {
-    if (!controls || !autoRotateEnabled) {
+    if (!controls || !autoRotateRuntimeEnabled) {
       return;
     }
 
@@ -568,7 +708,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   }
 
   function handleOrbitEnd() {
-    if (!controls || !autoRotateEnabled) {
+    if (!controls || !autoRotateRuntimeEnabled) {
       return;
     }
 
@@ -719,8 +859,10 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     { geometry: innerGeometry, object: innerCore },
   ];
   let loadedModel: Object3D | null = null;
+  let loadedModelMaxDimension = 0;
   let externalModelTexture: Texture | null = null;
   let modelMixer: AnimationMixer | null = null;
+  let debugGuiController: HeroDebugGuiController | null = null;
   let pixelSampleTarget: WebGLRenderTarget | null = null;
   let pixelSampleBuffer: Uint8Array | null = null;
   let pixelSampleWidth = 0;
@@ -733,25 +875,37 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   let lastAsciiUpdate = -Infinity;
   let disposed = false;
   let paused = document.visibilityState === "hidden";
-  const effectiveAsciiUpdateFPS = isSmallScreen
+  let effectiveAsciiUpdateFPS = isSmallScreen
     ? Math.min(settings.ascii.updateFPS, 15)
     : settings.ascii.updateFPS;
-  const asciiUpdateInterval = reduceMotion ? Infinity : 1000 / effectiveAsciiUpdateFPS;
-  const maxAsciiColumns = isSmallScreen
+  let asciiUpdateInterval = reduceMotion ? Infinity : 1000 / effectiveAsciiUpdateFPS;
+  let maxAsciiColumns = isSmallScreen
     ? Math.min(64, settings.ascii.resolution)
     : settings.ascii.resolution;
-  const splitAngleRadians = THREE.MathUtils.degToRad(settings.splitAngle);
-  const asciiCharacters = normalizeCharset(settings.ascii.charset);
-  const effectiveAsciiSampleCount = isSmallScreen
+  let splitAngleRadians = THREE.MathUtils.degToRad(settings.splitAngle);
+  let asciiCharacters = normalizeCharset(settings.ascii.charset);
+  let effectiveAsciiSampleCount = isSmallScreen
     ? Math.min(settings.ascii.sampleCount, 2)
     : settings.ascii.sampleCount;
-  const asciiSampleOffsets = getAsciiSampleOffsets(settings.ascii.samplePattern, effectiveAsciiSampleCount);
-  const shapeVectorSize = getShapeVectorSize(settings.ascii.shapeVectorMode);
-  const shapeCharacterVectors = settings.ascii.useShapeAwareLookup
+  let asciiSampleOffsets = getAsciiSampleOffsets(settings.ascii.samplePattern, effectiveAsciiSampleCount);
+  let shapeVectorSize = getShapeVectorSize(settings.ascii.shapeVectorMode);
+  let shapeCharacterVectors = settings.ascii.useShapeAwareLookup
     ? createShapeVectorLookup(asciiCharacters, settings.ascii.shapeVectorMode, settings.ascii.fontSize)
     : [];
   const shapeLookupCache = new Map<string, string>();
-  const hasAngledSplit = Math.abs(splitAngleRadians) > 0.001;
+  let shapeResourceConfigKey = [
+    settings.ascii.charset,
+    settings.ascii.useShapeAwareLookup,
+    settings.ascii.shapeVectorMode,
+    settings.ascii.fontSize,
+  ].join("|");
+  let shapeLookupCacheConfigKey = [
+    settings.ascii.charset,
+    settings.ascii.useShapeAwareLookup,
+    settings.ascii.shapeVectorMode,
+    settings.ascii.lookupQuantization,
+  ].join("|");
+  let hasAngledSplit = Math.abs(splitAngleRadians) > 0.001;
   let shapeAwareRuntimeEnabled = settings.ascii.useShapeAwareLookup && shapeCharacterVectors.length > 0 && !isSmallScreen;
   let slowShapeAwareFrames = 0;
   container.dataset.asciiRuntime = asciiRuntimeEnabled ? "active" : "disabled";
@@ -763,6 +917,51 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   container.dataset.asciiEffectiveUpdateFps = String(effectiveAsciiUpdateFPS);
   container.dataset.asciiEffectiveSampleCount = String(effectiveAsciiSampleCount);
   container.dataset.asciiShapeRuntime = shapeAwareRuntimeEnabled ? "shape-aware" : "brightness";
+
+  function refreshAsciiRuntimeCache(config = settings) {
+    effectiveAsciiUpdateFPS = isSmallScreen ? Math.min(config.ascii.updateFPS, 15) : config.ascii.updateFPS;
+    asciiUpdateInterval = reduceMotion ? Infinity : 1000 / effectiveAsciiUpdateFPS;
+    maxAsciiColumns = isSmallScreen ? Math.min(64, config.ascii.resolution) : config.ascii.resolution;
+    effectiveAsciiSampleCount = isSmallScreen ? Math.min(config.ascii.sampleCount, 2) : config.ascii.sampleCount;
+    asciiSampleOffsets = getAsciiSampleOffsets(config.ascii.samplePattern, effectiveAsciiSampleCount);
+    asciiCharacters = normalizeCharset(config.ascii.charset);
+
+    const nextShapeResourceConfigKey = [
+      config.ascii.charset,
+      config.ascii.useShapeAwareLookup,
+      config.ascii.shapeVectorMode,
+      config.ascii.fontSize,
+    ].join("|");
+    const nextShapeLookupCacheConfigKey = [
+      config.ascii.charset,
+      config.ascii.useShapeAwareLookup,
+      config.ascii.shapeVectorMode,
+      config.ascii.lookupQuantization,
+    ].join("|");
+
+    if (nextShapeResourceConfigKey !== shapeResourceConfigKey) {
+      shapeVectorSize = getShapeVectorSize(config.ascii.shapeVectorMode);
+      shapeCharacterVectors = config.ascii.useShapeAwareLookup
+        ? createShapeVectorLookup(asciiCharacters, config.ascii.shapeVectorMode, config.ascii.fontSize)
+        : [];
+      shapeLookupCache.clear();
+      shapeAwareRuntimeEnabled = config.ascii.useShapeAwareLookup && shapeCharacterVectors.length > 0 && !isSmallScreen;
+      slowShapeAwareFrames = 0;
+      shapeResourceConfigKey = nextShapeResourceConfigKey;
+      shapeLookupCacheConfigKey = nextShapeLookupCacheConfigKey;
+    } else if (nextShapeLookupCacheConfigKey !== shapeLookupCacheConfigKey) {
+      shapeLookupCache.clear();
+      slowShapeAwareFrames = 0;
+      shapeLookupCacheConfigKey = nextShapeLookupCacheConfigKey;
+    }
+
+    container.dataset.asciiDensityRuntime = config.ascii.densityMode;
+    container.dataset.asciiEffectiveResolution = String(maxAsciiColumns);
+    container.dataset.asciiEffectiveUpdateFps = String(effectiveAsciiUpdateFPS);
+    container.dataset.asciiEffectiveSampleCount = String(effectiveAsciiSampleCount);
+    container.dataset.asciiShapeRuntime = shapeAwareRuntimeEnabled ? "shape-aware" : "brightness";
+    lastAsciiUpdate = -Infinity;
+  }
 
   function getAsciiCellMetrics(viewportWidth: number) {
     if (settings.ascii.densityMode === "fixed-cell") {
@@ -805,31 +1004,52 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     pixelSampleHeight = height;
   }
 
-  if (OrbitControlsClass) {
+  function createOrbitControlsIfNeeded() {
+    if (controls || !OrbitControlsClass) {
+      return controls;
+    }
+
     controls = new OrbitControlsClass(camera, renderer.domElement);
     controls.target.copy(root.position);
-    controls.enableDamping = settings.orbit.enableDamping;
-    controls.dampingFactor = settings.orbit.dampingFactor;
-    controls.enableZoom = settings.orbit.enableZoom;
-    controls.enablePan = settings.orbit.enablePan;
-    controls.autoRotate = autoRotateEnabled;
-    controls.autoRotateSpeed = settings.orbit.autoRotateSpeed;
-    controls.minPolarAngle = settings.orbit.minPolarAngle;
-    controls.maxPolarAngle = settings.orbit.maxPolarAngle;
-    controls.minAzimuthAngle = settings.orbit.minAzimuthAngle;
-    controls.maxAzimuthAngle = settings.orbit.maxAzimuthAngle;
-    controls.rotateSpeed = isSmallScreen ? settings.orbit.touchRotateSpeed : settings.orbit.rotateSpeed;
     controls.touches.ONE = THREE.TOUCH.ROTATE;
     controls.touches.TWO = THREE.TOUCH.ROTATE;
     controls.addEventListener("start", handleOrbitStart);
     controls.addEventListener("end", handleOrbitEnd);
     controls.addEventListener("change", renderCameraChange);
-    controls.update();
-    renderer.domElement.style.touchAction = isSmallScreen ? "pan-y" : "none";
-    container.dataset.orbitActive = "true";
-  } else {
-    container.dataset.orbitActive = "false";
+    return controls;
   }
+
+  function configureOrbitControls(config = settings) {
+    const controlsAllowed = config.enableOrbitControls && !(isSmallScreen && config.orbit.disableOnMobile);
+    const activeControls = controlsAllowed ? createOrbitControlsIfNeeded() : controls;
+    autoRotateRuntimeEnabled = controlsAllowed && config.orbit.autoRotate && !reduceMotion;
+    container.dataset.orbitAutoRotateRuntime = autoRotateRuntimeEnabled ? "enabled" : "disabled";
+    renderer.domElement.style.touchAction = controlsAllowed ? (isSmallScreen ? "pan-y" : "none") : "auto";
+
+    if (!activeControls) {
+      container.dataset.orbitActive = "false";
+      return null;
+    }
+
+    activeControls.enabled = controlsAllowed;
+    activeControls.target.copy(root.position);
+    activeControls.enableDamping = config.orbit.enableDamping;
+    activeControls.dampingFactor = config.orbit.dampingFactor;
+    activeControls.enableZoom = config.orbit.enableZoom;
+    activeControls.enablePan = config.orbit.enablePan;
+    activeControls.autoRotate = autoRotateRuntimeEnabled;
+    activeControls.autoRotateSpeed = config.orbit.autoRotateSpeed;
+    activeControls.minPolarAngle = Math.min(config.orbit.minPolarAngle, config.orbit.maxPolarAngle);
+    activeControls.maxPolarAngle = Math.max(config.orbit.minPolarAngle, config.orbit.maxPolarAngle);
+    activeControls.minAzimuthAngle = -Infinity;
+    activeControls.maxAzimuthAngle = Infinity;
+    activeControls.rotateSpeed = isSmallScreen ? config.orbit.touchRotateSpeed : config.orbit.rotateSpeed;
+    activeControls.update();
+    container.dataset.orbitActive = controlsAllowed ? "true" : "false";
+    return activeControls;
+  }
+
+  configureOrbitControls();
 
   async function loadExternalModelTexture() {
     if (settings.modelTextureSource !== "external" || !settings.modelTextureUrl) {
@@ -1012,6 +1232,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       const center = bounds.getCenter(new THREE.Vector3());
       const maxDimension = Math.max(size.x, size.y, size.z);
       if (Number.isFinite(maxDimension) && maxDimension > 0) {
+        loadedModelMaxDimension = maxDimension;
         loadedModel.position.sub(center);
         loadedModel.scale.setScalar(settings.modelView.modelFitSize / maxDimension);
       }
@@ -1057,6 +1278,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       }
       disposeModelOverrideResources();
       loadedModel = null;
+      loadedModelMaxDimension = 0;
       proceduralGroup.visible = true;
       asciiEdgeSources = [
         { geometry: coreEdgesGeometry, object: core },
@@ -1422,7 +1644,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       weight *= 1 - settings.ascii.normalLightingStrength + light * settings.ascii.normalLightingStrength;
     }
 
-    return clampNumber(weight, 0, 1);
+    return clampNumber(weight, 0, 2);
   }
 
   function drawSurfaceAsAscii(
@@ -1991,10 +2213,170 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     }
   }
 
+  function applyRenderMode(config = settings) {
+    const visualEnabled = config.enabled && !(isSmallScreen && config.disableOnMobile);
+    const requestedMode =
+      config.renderMode === "pixelSample" && isSmallScreen && config.ascii.pixelSampleDisableOnMobile
+        ? "edgeProjection"
+        : config.renderMode;
+
+    activeRenderMode = requestedMode;
+    asciiRuntimeEnabled =
+      visualEnabled &&
+      activeRenderMode !== "normalOnly" &&
+      config.ascii.enabled &&
+      !(isSmallScreen && config.ascii.disableOnMobile);
+
+    if (activeRenderMode !== "pixelSample") {
+      disposePixelSampleTarget();
+    }
+
+    renderer.domElement.style.display = visualEnabled ? "" : "none";
+    asciiCanvas.style.display = visualEnabled && activeRenderMode !== "normalOnly" ? "" : "none";
+    if (backgroundTitle) {
+      backgroundTitle.style.display = visualEnabled && config.backgroundTitle.enabled ? "" : "none";
+    }
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, config.maxPixelRatio));
+    renderer.setSize(Math.max(1, container.clientWidth), Math.max(1, container.clientHeight), false);
+    setAsciiCanvasSize(Math.max(1, container.clientWidth), Math.max(1, container.clientHeight));
+    container.dataset.sceneState = visualEnabled
+      ? reduceMotion
+        ? "ready-reduced-motion"
+        : "ready"
+      : "fallback-debug-disabled";
+    container.dataset.renderModeRequested = config.renderMode;
+    container.dataset.renderModeRuntime =
+      !visualEnabled
+        ? "disabled"
+        : config.renderMode === "pixelSample" && requestedMode === "edgeProjection"
+          ? "pixelSample-disabled-mobile-edgeProjection"
+          : activeRenderMode;
+    container.dataset.asciiRuntime = asciiRuntimeEnabled ? "active" : "disabled";
+
+    if (!asciiRuntimeEnabled) {
+      asciiContext?.clearRect(0, 0, container.clientWidth, container.clientHeight);
+    }
+
+    if (!visualEnabled) {
+      renderer.clear();
+      return;
+    }
+
+    renderNormalSide();
+    renderAsciiLayer(performance.now(), true);
+  }
+
+  function applySplitSettings(config = settings) {
+    splitAngleRadians = THREE.MathUtils.degToRad(config.splitAngle);
+    hasAngledSplit = Math.abs(splitAngleRadians) > 0.001;
+
+    visualRoot?.style.setProperty("--hero-split-position", `${clampNumber(config.splitPosition, 0, 1) * 100}%`);
+    visualRoot?.style.setProperty("--hero-split-softness", `${clampNumber(config.splitSoftness, 0, 0.25) * 100}%`);
+    visualRoot?.style.setProperty("--hero-split-line-color", `rgba(255, 207, 90, ${config.showSplitLine ? 0.22 : 0})`);
+    visualRoot?.style.setProperty("--hero-background-title-gradient-angle", `${90 + config.splitAngle}deg`);
+    visualRoot?.style.setProperty(
+      "--hero-background-title-normal-color",
+      config.asciiSide === "left" ? config.backgroundTitle.asciiColor : config.backgroundTitle.normalColor,
+    );
+    visualRoot?.style.setProperty(
+      "--hero-background-title-ascii-color",
+      config.asciiSide === "left" ? config.backgroundTitle.normalColor : config.backgroundTitle.asciiColor,
+    );
+
+    renderNormalSide();
+    renderAsciiLayer(performance.now(), true);
+  }
+
+  function applyModelView(config = settings) {
+    camera.fov = config.modelView.cameraFov;
+    camera.position.set(0, config.modelView.cameraY, config.modelView.cameraDistance);
+    camera.updateProjectionMatrix();
+    root.position.set(config.modelView.position.x, config.modelView.position.y, config.modelView.position.z);
+
+    if (loadedModel && loadedModelMaxDimension > 0) {
+      loadedModel.scale.setScalar(config.modelView.modelFitSize / loadedModelMaxDimension);
+    } else {
+      proceduralGroup.scale.setScalar(config.modelView.modelFitSize / Math.max(0.001, proceduralBaseFitSize));
+    }
+
+    controls?.target.copy(root.position);
+    controls?.update();
+    renderNormalSide();
+    renderAsciiLayer(performance.now(), true);
+  }
+
+  function applyOrbitSettings(config = settings) {
+    configureOrbitControls(config);
+    renderNormalSide();
+    renderAsciiLayer(performance.now(), true);
+  }
+
+  function applyAsciiSettings(config = settings) {
+    refreshAsciiRuntimeCache(config);
+    applyRenderMode(config);
+  }
+
+  function applyBackgroundTitleSettings(config = settings) {
+    if (config.backgroundTitle.enabled && config.backgroundTitle.text && !backgroundTitle) {
+      backgroundTitle = document.createElement("div");
+      backgroundTitle.className = "hero-background-title";
+      backgroundTitle.setAttribute("aria-hidden", "true");
+      container.insertBefore(backgroundTitle, renderer.domElement);
+    }
+
+    if (backgroundTitle) {
+      backgroundTitle.textContent = config.backgroundTitle.text;
+      backgroundTitle.style.display = config.enabled && config.backgroundTitle.enabled ? "" : "none";
+    }
+
+    visualRoot?.style.setProperty("--hero-background-title-opacity", String(config.backgroundTitle.opacity));
+    visualRoot?.style.setProperty("--hero-background-title-font-size", config.backgroundTitle.fontSize);
+    visualRoot?.style.setProperty("--hero-background-title-x", config.backgroundTitle.x);
+    visualRoot?.style.setProperty("--hero-background-title-y", config.backgroundTitle.y);
+    applySplitSettings(config);
+  }
+
+  function applyOverlaySettings(config = settings) {
+    visualRoot?.style.setProperty(
+      "--hero-media-overlay-opacity",
+      String(config.mediaOverlay.visible ? clampNumber(config.mediaOverlay.opacity, 0, 1) : 0),
+    );
+    visualRoot?.style.setProperty("--hero-fallback-tint-color", config.fallbackTint.color);
+    visualRoot?.style.setProperty("--hero-fallback-tint-blend-mode", config.fallbackTint.blendMode);
+  }
+
+  function applyAllRuntimeSettings(config = settings) {
+    applyRenderMode(config);
+    applySplitSettings(config);
+    applyModelView(config);
+    applyOrbitSettings(config);
+    applyAsciiSettings(config);
+    applyBackgroundTitleSettings(config);
+    applyOverlaySettings(config);
+  }
+
   resizeObserver.observe(container);
   setAsciiCanvasSize(width, height);
   document.addEventListener("visibilitychange", handleVisibilityChange);
   void loadUrlModel();
+  void loadHeroDebugGui(settings, container, {
+    applyRenderMode,
+    applySplitSettings,
+    applyModelView,
+    applyOrbitSettings,
+    applyAsciiSettings,
+    applyBackgroundTitleSettings,
+    applyOverlaySettings,
+    resetToDefaults: applyAllRuntimeSettings,
+  }).then((controller) => {
+    if (disposed) {
+      controller?.destroy();
+      return;
+    }
+
+    debugGuiController = controller;
+  });
 
   renderFrame(0);
   if (!reduceMotion) {
@@ -2013,11 +2395,14 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       controls?.removeEventListener("end", handleOrbitEnd);
       controls?.removeEventListener("change", renderCameraChange);
       controls?.dispose();
+      debugGuiController?.destroy();
+      debugGuiController = null;
       modelMixer?.stopAllAction();
       modelMixer = null;
       if (loadedModel) {
         disposeLoadedObject(loadedModel);
       }
+      loadedModelMaxDimension = 0;
 
       disposeModelOverrideResources();
       disposePixelSampleTarget();
