@@ -14,6 +14,13 @@ export const site = {
     enabled: true,
     mode: "three-ascii-split",
     renderMode: "edgeProjection",
+    debugGui: {
+      enabled: true,
+      showInProduction: false,
+      startOpen: true,
+      width: 360,
+      enableWithQueryParam: true,
+    },
     modelSource: "url",
     asciiSide: "right",
     splitPosition: 0.5,
