@@ -14,6 +14,20 @@ type AsciiSamplePattern = "center" | "grid" | "circle6";
 type AsciiShapeVectorMode = "2d" | "6d";
 type AsciiDensityMode = "fixed-cell" | "fit-width";
 type AsciiColorSamplingMode = "center" | "average" | "dominant";
+type AsciiColorBlendMode =
+  | "normal"
+  | "multiply"
+  | "screen"
+  | "overlay"
+  | "darken"
+  | "lighten"
+  | "color-dodge"
+  | "color-burn"
+  | "hard-light"
+  | "soft-light"
+  | "difference"
+  | "exclusion"
+  | "plus-lighter";
 
 type AsciiCharacterVector = {
   character: string;
@@ -151,6 +165,7 @@ type HeroThreeSettings = {
     colorSampling: {
       enabled: boolean;
       mode: AsciiColorSamplingMode;
+      blendMode: AsciiColorBlendMode;
       strength: number;
       saturation: number;
       brightness: number;
@@ -159,6 +174,10 @@ type HeroThreeSettings = {
       grayscaleFallback: boolean;
       sampleBackground: boolean;
       minAlpha: number;
+      forceVisibleColorCells: boolean;
+      minimumCharacter: string;
+      minimumColorLuminance: number;
+      visibilityBoost: number;
       disableOnMobile: boolean;
     };
     cellAspect: number;
@@ -227,6 +246,23 @@ function readDensityMode(value: string | undefined): AsciiDensityMode {
 
 function readColorSamplingMode(value: string | undefined): AsciiColorSamplingMode {
   return value === "center" || value === "dominant" || value === "average" ? value : "average";
+}
+
+function readColorBlendMode(value: string | undefined): AsciiColorBlendMode {
+  return value === "multiply" ||
+    value === "screen" ||
+    value === "overlay" ||
+    value === "darken" ||
+    value === "lighten" ||
+    value === "color-dodge" ||
+    value === "color-burn" ||
+    value === "hard-light" ||
+    value === "soft-light" ||
+    value === "difference" ||
+    value === "exclusion" ||
+    value === "plus-lighter"
+    ? value
+    : "normal";
 }
 
 function readRenderMode(value: string | undefined): HeroRenderMode {
@@ -339,6 +375,7 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
       colorSampling: {
         enabled: container.dataset.asciiColorSamplingEnabled === "true",
         mode: readColorSamplingMode(container.dataset.asciiColorSamplingMode),
+        blendMode: readColorBlendMode(container.dataset.asciiColorSamplingBlendMode),
         strength: clampNumber(parseNumber(container.dataset.asciiColorSamplingStrength ?? null, 1), 0, 1),
         saturation: clampNumber(parseNumber(container.dataset.asciiColorSamplingSaturation ?? null, 1), 0, 4),
         brightness: clampNumber(parseNumber(container.dataset.asciiColorSamplingBrightness ?? null, 1), 0, 4),
@@ -347,6 +384,10 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
         grayscaleFallback: container.dataset.asciiColorSamplingGrayscaleFallback === "true",
         sampleBackground: container.dataset.asciiColorSamplingSampleBackground === "true",
         minAlpha: clampNumber(parseNumber(container.dataset.asciiColorSamplingMinAlpha ?? null, 0.05), 0, 1),
+        forceVisibleColorCells: container.dataset.asciiColorSamplingForceVisibleColorCells === "true",
+        minimumCharacter: container.dataset.asciiColorSamplingMinimumCharacter ?? ".",
+        minimumColorLuminance: clampNumber(parseNumber(container.dataset.asciiColorSamplingMinimumColorLuminance ?? null, 0.05), 0, 1),
+        visibilityBoost: clampNumber(parseNumber(container.dataset.asciiColorSamplingVisibilityBoost ?? null, 0.35), 0, 1),
         disableOnMobile: container.dataset.asciiColorSamplingDisableOnMobile === "true",
       },
       cellAspect: clampNumber(parseNumber(container.dataset.asciiCellAspect ?? null, 1.8), 0.5, 3),
@@ -1461,6 +1502,14 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     return `rgba(${Math.round(clampNumber(color.r, 0, 255))}, ${Math.round(clampNumber(color.g, 0, 255))}, ${Math.round(clampNumber(color.b, 0, 255))}, ${clampNumber(color.a, 0, 1)})`;
   }
 
+  function getDisplayColorLuminance(color: RgbaColor) {
+    return clampNumber((color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722) / 255, 0, 1);
+  }
+
+  function getMinimumColorCharacter() {
+    return Array.from(settings.ascii.colorSampling.minimumCharacter.trim())[0] ?? ".";
+  }
+
   function mixColorsTo(a: RgbaColor, b: RgbaColor, amount: number, target: RgbaColor): RgbaColor {
     const t = clampNumber(amount, 0, 1);
 
@@ -1468,6 +1517,53 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     target.g = a.g + (b.g - a.g) * t;
     target.b = a.b + (b.b - a.b) * t;
     target.a = a.a + (b.a - a.a) * t;
+    return target;
+  }
+
+  function blendChannel(base: number, blend: number, mode: AsciiColorBlendMode) {
+    switch (mode) {
+      case "multiply":
+        return base * blend;
+      case "screen":
+        return 1 - (1 - base) * (1 - blend);
+      case "overlay":
+        return base < 0.5 ? 2 * base * blend : 1 - 2 * (1 - base) * (1 - blend);
+      case "darken":
+        return Math.min(base, blend);
+      case "lighten":
+        return Math.max(base, blend);
+      case "color-dodge":
+        return blend >= 1 ? 1 : Math.min(1, base / Math.max(0.0001, 1 - blend));
+      case "color-burn":
+        return blend <= 0 ? 0 : 1 - Math.min(1, (1 - base) / Math.max(0.0001, blend));
+      case "hard-light":
+        return blend < 0.5 ? 2 * base * blend : 1 - 2 * (1 - base) * (1 - blend);
+      case "soft-light":
+        return (1 - 2 * blend) * base * base + 2 * blend * base;
+      case "difference":
+        return Math.abs(base - blend);
+      case "exclusion":
+        return base + blend - 2 * base * blend;
+      case "plus-lighter":
+        return Math.min(1, base + blend);
+      case "normal":
+      default:
+        return blend;
+    }
+  }
+
+  function blendSampledColorTo(baseColor: RgbaColor, sampledColor: RgbaColor, mode: AsciiColorBlendMode, target: RgbaColor) {
+    const baseR = clampNumber(baseColor.r / 255, 0, 1);
+    const baseG = clampNumber(baseColor.g / 255, 0, 1);
+    const baseB = clampNumber(baseColor.b / 255, 0, 1);
+    const sampledR = clampNumber(sampledColor.r / 255, 0, 1);
+    const sampledG = clampNumber(sampledColor.g / 255, 0, 1);
+    const sampledB = clampNumber(sampledColor.b / 255, 0, 1);
+
+    target.r = blendChannel(baseR, sampledR, mode) * 255;
+    target.g = blendChannel(baseG, sampledG, mode) * 255;
+    target.b = blendChannel(baseB, sampledB, mode) * 255;
+    target.a = sampledColor.a;
     return target;
   }
 
@@ -1567,42 +1663,6 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
 
     tuneSampledColorTo(target, target);
     return true;
-  }
-
-  function getPixelSampleAsciiColorTo(
-    buffer: Uint8Array,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    sampleWidth: number,
-    sampleHeight: number,
-    baseColor: RgbaColor,
-    target: RgbaColor,
-    sampledColor: RgbaColor,
-    sampleScratch: RgbaColor,
-  ) {
-    if (!pixelSampleColorSamplingRuntimeEnabled) {
-      target.r = baseColor.r;
-      target.g = baseColor.g;
-      target.b = baseColor.b;
-      target.a = baseColor.a;
-      return target;
-    }
-
-    const colorSampling = settings.ascii.colorSampling;
-    const hasSample = getPixelSampleColorTo(buffer, x, y, width, height, sampleWidth, sampleHeight, sampledColor, sampleScratch);
-    if (!hasSample) {
-      target.r = baseColor.r;
-      target.g = baseColor.g;
-      target.b = baseColor.b;
-      target.a = baseColor.a;
-      return target;
-    }
-
-    mixColorsTo(baseColor, sampledColor, colorSampling.strength, target);
-    target.a = baseColor.a * colorSampling.alpha;
-    return target;
   }
 
   function getPixelSampleEdgeBoost(buffer: Uint8Array, x: number, y: number, width: number, height: number, value: number) {
@@ -2270,6 +2330,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     const baseColor: RgbaColor = { r: 0, g: 0, b: 0, a: 1 };
     const characterColor: RgbaColor = { r: 0, g: 0, b: 0, a: 1 };
     const sampledColor: RgbaColor = { r: 0, g: 0, b: 0, a: 1 };
+    const blendedColor: RgbaColor = { r: 0, g: 0, b: 0, a: 1 };
     const sampleScratch: RgbaColor = { r: 0, g: 0, b: 0, a: 1 };
 
     for (let row = 0; row < rows; row += 1) {
@@ -2291,19 +2352,21 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
         const baseValue = getPixelSampleValue(pixelSampleBuffer, sampleX, sampleY, targetWidth, targetHeight);
         const edgeBoost = getPixelSampleEdgeBoost(pixelSampleBuffer, sampleX, sampleY, targetWidth, targetHeight, baseValue);
         const tunedLevel = tuneAsciiValue(clampNumber(baseValue + edgeBoost, 0, 1));
-        const character = getCharacterFromAsciiValue(tunedLevel);
-        if (character === " ") {
-          continue;
-        }
-
-        setAsciiRampColor(tunedLevel, baseColor);
+        let character = getCharacterFromAsciiValue(tunedLevel);
+        let shouldDrawCharacter = character !== " ";
+        let characterLevel = tunedLevel;
+        setAsciiRampColor(characterLevel, baseColor);
         characterColor.r = baseColor.r;
         characterColor.g = baseColor.g;
         characterColor.b = baseColor.b;
         characterColor.a = baseColor.a;
-        if (pixelSampleColorSamplingRuntimeEnabled) {
+        const shouldTryColorSampling =
+          pixelSampleColorSamplingRuntimeEnabled &&
+          (shouldDrawCharacter || settings.ascii.colorSampling.forceVisibleColorCells);
+
+        if (shouldTryColorSampling) {
           try {
-            getPixelSampleAsciiColorTo(
+            const hasSample = getPixelSampleColorTo(
               pixelSampleBuffer,
               sampleX,
               sampleY,
@@ -2311,16 +2374,36 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
               targetHeight,
               targetSampleWidth,
               targetSampleHeight,
-              baseColor,
-              characterColor,
               sampledColor,
               sampleScratch,
             );
+
+            if (hasSample) {
+              const sampledLuminance = getDisplayColorLuminance(sampledColor);
+              if (
+                !shouldDrawCharacter &&
+                settings.ascii.colorSampling.forceVisibleColorCells &&
+                sampledLuminance >= settings.ascii.colorSampling.minimumColorLuminance
+              ) {
+                shouldDrawCharacter = true;
+                character = getMinimumColorCharacter();
+                characterLevel = Math.max(tunedLevel, settings.ascii.colorSampling.visibilityBoost);
+                setAsciiRampColor(characterLevel, baseColor);
+              }
+
+              blendSampledColorTo(baseColor, sampledColor, settings.ascii.colorSampling.blendMode, blendedColor);
+              mixColorsTo(baseColor, blendedColor, settings.ascii.colorSampling.strength, characterColor);
+              characterColor.a = baseColor.a * settings.ascii.colorSampling.alpha;
+            }
           } catch (error) {
             pixelSampleColorSamplingRuntimeEnabled = false;
             container.dataset.pixelSampleColorRuntime = "fallback-uncolored";
             console.warn("Hero pixel-sample color sampling failed; continuing with uncolored pixel-sample ASCII.", error);
           }
+        }
+
+        if (!shouldDrawCharacter) {
+          continue;
         }
 
         asciiContext.globalAlpha = fade;

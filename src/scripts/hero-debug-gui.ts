@@ -56,6 +56,7 @@ type HeroDebugConfigShape = {
     colorSampling: {
       enabled: boolean;
       mode: "center" | "average" | "dominant";
+      blendMode: string;
       strength: number;
       saturation: number;
       brightness: number;
@@ -64,6 +65,10 @@ type HeroDebugConfigShape = {
       grayscaleFallback: boolean;
       sampleBackground: boolean;
       minAlpha: number;
+      forceVisibleColorCells: boolean;
+      minimumCharacter: string;
+      minimumColorLuminance: number;
+      visibilityBoost: number;
       disableOnMobile: boolean;
     };
     cellAspect: number;
@@ -431,12 +436,28 @@ function addAsciiColorSamplingFolder<Config extends PlainConfig>(
 ) {
   const heroConfig = config as Config & HeroDebugConfigShape;
   const folder = gui.addFolder("ASCII Color Sampling");
+  const blendModes = [
+    "normal",
+    "multiply",
+    "screen",
+    "overlay",
+    "darken",
+    "lighten",
+    "color-dodge",
+    "color-burn",
+    "hard-light",
+    "soft-light",
+    "difference",
+    "exclusion",
+    "plus-lighter",
+  ];
 
   folder.add(heroConfig.ascii.colorSampling, "enabled").name("enabled (pixelSample only)").onChange(applyAsciiSettings);
   folder
     .add(heroConfig.ascii.colorSampling, "mode", ["center", "average", "dominant"])
     .name("mode")
     .onChange(applyAsciiSettings);
+  folder.add(heroConfig.ascii.colorSampling, "blendMode", blendModes).name("blendMode").onChange(applyAsciiSettings);
   folder.add(heroConfig.ascii.colorSampling, "strength", 0, 1, 0.01).name("strength").onChange(applyAsciiSettings);
   folder.add(heroConfig.ascii.colorSampling, "saturation", 0, 3, 0.01).name("saturation").onChange(applyAsciiSettings);
   folder.add(heroConfig.ascii.colorSampling, "brightness", 0, 3, 0.01).name("brightness").onChange(applyAsciiSettings);
@@ -445,6 +466,19 @@ function addAsciiColorSamplingFolder<Config extends PlainConfig>(
   folder.add(heroConfig.ascii.colorSampling, "grayscaleFallback").name("grayscaleFallback").onChange(applyAsciiSettings);
   folder.add(heroConfig.ascii.colorSampling, "sampleBackground").name("sampleBackground").onChange(applyAsciiSettings);
   folder.add(heroConfig.ascii.colorSampling, "minAlpha", 0, 1, 0.01).name("minAlpha").onChange(applyAsciiSettings);
+  folder
+    .add(heroConfig.ascii.colorSampling, "forceVisibleColorCells")
+    .name("forceVisibleColorCells")
+    .onChange(applyAsciiSettings);
+  folder.add(heroConfig.ascii.colorSampling, "minimumCharacter").name("minimumCharacter").onChange(applyAsciiSettings);
+  folder
+    .add(heroConfig.ascii.colorSampling, "minimumColorLuminance", 0, 1, 0.01)
+    .name("minimumColorLuminance")
+    .onChange(applyAsciiSettings);
+  folder
+    .add(heroConfig.ascii.colorSampling, "visibilityBoost", 0, 1, 0.01)
+    .name("visibilityBoost")
+    .onChange(applyAsciiSettings);
   folder.add(heroConfig.ascii.colorSampling, "disableOnMobile").name("disableOnMobile").onChange(applyAsciiSettings);
 
   return folder;
