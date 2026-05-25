@@ -1101,9 +1101,30 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       stencilBuffer: false,
     });
     pixelSampleTarget.texture.name = "Hero pixel-sample ASCII source";
+    pixelSampleTarget.viewport.set(0, 0, width, height);
+    pixelSampleTarget.scissor.set(0, 0, width, height);
+    pixelSampleTarget.scissorTest = false;
     pixelSampleBuffer = new Uint8Array(width * height * 4);
     pixelSampleWidth = width;
     pixelSampleHeight = height;
+  }
+
+  function getPixelSampleTargetSize(viewportWidth: number, viewportHeight: number, fullColumns: number) {
+    const maxWidth = isSmallScreen ? 96 : 220;
+    const maxHeight = isSmallScreen ? 80 : 140;
+    const aspect = viewportWidth / Math.max(1, viewportHeight);
+    let targetWidth = Math.max(16, Math.min(maxWidth, fullColumns));
+    let targetHeight = Math.max(12, Math.round(targetWidth / Math.max(0.1, aspect)));
+
+    if (targetHeight > maxHeight) {
+      targetHeight = maxHeight;
+      targetWidth = Math.max(16, Math.round(targetHeight * aspect));
+    }
+
+    return {
+      targetWidth,
+      targetHeight,
+    };
   }
 
   function createOrbitControlsIfNeeded() {
@@ -1409,35 +1430,37 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   }
 
   function renderNormalSide() {
-    const drawingWidth = renderer.domElement.width;
-    const drawingHeight = renderer.domElement.height;
+    const cssWidth = Math.max(1, container.clientWidth);
+    const cssHeight = Math.max(1, container.clientHeight);
 
     if (!asciiRuntimeEnabled || hasAngledSplit) {
       renderer.setScissorTest(false);
       renderer.clear();
-      renderer.setViewport(0, 0, drawingWidth, drawingHeight);
+      renderer.setViewport(0, 0, cssWidth, cssHeight);
       renderer.render(scene, camera);
       return;
     }
 
-    const split = Math.floor(drawingWidth * settings.splitPosition);
-    const softness =
-      split <= 0 || split >= drawingWidth ? 0 : Math.floor(drawingWidth * settings.splitSoftness);
+    const splitCss = cssWidth * settings.splitPosition;
+    const softnessCss =
+      splitCss <= 0 || splitCss >= cssWidth ? 0 : cssWidth * settings.splitSoftness;
+    const split = Math.round(splitCss);
+    const softness = softnessCss <= 0 ? 0 : Math.round(softnessCss);
     const normalStart =
       settings.asciiSide === "right"
         ? 0
-        : clampNumber(split - softness, 0, drawingWidth);
+        : clampNumber(split - softness, 0, cssWidth);
     const normalEnd =
       settings.asciiSide === "right"
-        ? clampNumber(split + softness, 0, drawingWidth)
-        : drawingWidth;
+        ? clampNumber(split + softness, 0, cssWidth)
+        : cssWidth;
     const normalWidth = normalEnd - normalStart;
 
     renderer.setScissorTest(false);
     renderer.clear();
-    renderer.setViewport(0, 0, drawingWidth, drawingHeight);
+    renderer.setViewport(0, 0, cssWidth, cssHeight);
     if (normalWidth > 0) {
-      renderer.setScissor(normalStart, 0, normalWidth, drawingHeight);
+      renderer.setScissor(normalStart, 0, normalWidth, cssHeight);
       renderer.setScissorTest(true);
       renderer.render(scene, camera);
     }
@@ -2283,8 +2306,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     const columns = Math.max(1, Math.floor(asciiWidth / cellWidth));
     const rows = Math.max(1, Math.floor(viewportHeight / cellHeight));
     const fullColumns = Math.max(1, Math.ceil(viewportWidth / cellWidth));
-    const targetWidth = Math.max(16, Math.min(isSmallScreen ? 96 : 220, fullColumns));
-    const targetHeight = Math.max(12, Math.min(isSmallScreen ? 80 : 140, rows));
+    const { targetWidth, targetHeight } = getPixelSampleTargetSize(viewportWidth, viewportHeight, fullColumns);
     const targetSampleWidth = targetWidth / Math.max(1, fullColumns);
     const targetSampleHeight = targetHeight / Math.max(1, rows);
 
@@ -2294,16 +2316,15 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     }
 
     const previousTarget = renderer.getRenderTarget();
-    const drawingWidth = renderer.domElement.width;
-    const drawingHeight = renderer.domElement.height;
+    const previousViewportWidth = Math.max(1, container.clientWidth);
+    const previousViewportHeight = Math.max(1, container.clientHeight);
     renderer.setRenderTarget(pixelSampleTarget);
     renderer.setScissorTest(false);
-    renderer.setViewport(0, 0, targetWidth, targetHeight);
     renderer.clear();
     renderer.render(scene, camera);
     renderer.readRenderTargetPixels(pixelSampleTarget, 0, 0, targetWidth, targetHeight, pixelSampleBuffer);
     renderer.setRenderTarget(previousTarget);
-    renderer.setViewport(0, 0, drawingWidth, drawingHeight);
+    renderer.setViewport(0, 0, previousViewportWidth, previousViewportHeight);
 
     asciiContext.clearRect(0, 0, viewportWidth, viewportHeight);
     const gradient = asciiContext.createLinearGradient(asciiX, 0, asciiX + asciiWidth, 0);
