@@ -14,6 +14,8 @@ interface Props {
 const { id, variant = "home" } = Astro.props;
 const showHeader = Astro.props.showHeader ?? variant === "home";
 const ui = getUi();
+const visiblePrimaryLinks = primaryContactLinks.filter((link) => Boolean(link.href));
+const visibleProfileLinks = profileLinks.filter((link) => Boolean(link.href));
 ---
 
 <section class:list={["page-section", "contact-section", `section-${variant}`]} id={id}>
@@ -30,9 +32,9 @@ const ui = getUi();
     )
   }
   <div class="contact-grid">
-    {primaryContactLinks.map((link) => <ContactButton {...link} />)}
+    {visiblePrimaryLinks.map((link) => <ContactButton {...link} />)}
   </div>
   <div class="profile-link-grid" aria-label="Additional profile links">
-    {profileLinks.map((link) => <ContactButton {...link} />)}
+    {visibleProfileLinks.map((link) => <ContactButton {...link} />)}
   </div>
 </section>

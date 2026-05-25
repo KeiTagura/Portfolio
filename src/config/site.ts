@@ -1,12 +1,12 @@
 const configuredSiteUrl = import.meta.env.PUBLIC_SITE_URL;
 
 export const site = {
-  name: "Kei Portfolio",
-  title: "Kei | Game Developer & Technical Artist",
+  name: "Grant Klein Portfolio",
+  title: "Grant Klein | Senior Programmer & Technical Artist",
   description:
-    "A visual portfolio for a game developer and technical artist focused on realtime tools, shaders, gameplay prototypes, and interactive media.",
+    "A visual portfolio for a senior programmer and technical artist focused on Unity, Unreal Engine, VR/AR, tooling, shaders, and web platforms.",
   url: configuredSiteUrl || "https://kakem.github.io/portfolio-kei",
-  author: "Kei",
+  author: "Grant Klein",
   locale: "en_US",
   ogImage: "/og-image.jpg",
   favicon: "/favicon.svg",
@@ -42,7 +42,7 @@ export const site = {
       cameraDistance: 7.2,
       cameraY: 0.55,
       cameraFov: 38,
-      modelFitSize: 6,
+      modelFitSize: 5,
       position: {
         x: 1.35,
         y: 0.05,
@@ -142,9 +142,9 @@ export const site = {
   pages: {
     home: {
       path: "/",
-      title: "Kei | Game Developer & Technical Artist",
+      title: "Grant Klein | Senior Programmer & Technical Artist",
       description:
-        "A visual portfolio for realtime prototypes, technical art, shaders, tools, and game development work.",
+        "A visual portfolio for Unity, Unreal Engine, VR/AR, technical art, tooling, and full-stack web development work.",
     },
     projects: {
       path: "/projects",
@@ -179,6 +179,17 @@ export const site = {
     tablet: 2,
     desktop: 3,
     wide: 4,
+  },
+  galleryThumbnail: {
+    showMediaType: false,
+    showTags: false,
+    showTitle: false,
+    showDescription: false,
+    generatedWidth: 640,
+    generatedFormat: "webp",
+    generatedQuality: 78,
+    fullImageMaxWidth: 1800,
+    fullImageQuality: 86,
   },
   pageHeaders: {
     projects: {

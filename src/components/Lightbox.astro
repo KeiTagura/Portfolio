@@ -116,7 +116,10 @@ const ui = getUi();
     }
     const title = trigger.getAttribute("data-title") ?? "";
     const description = trigger.getAttribute("data-description") ?? "";
+    const hasCaption = Boolean(title || description);
     lightboxCaption.replaceChildren();
+    lightboxCaption.hidden = !hasCaption;
+    lightboxPanel instanceof HTMLElement && lightboxPanel.classList.toggle("has-empty-caption", !hasCaption);
     if (title) {
       const heading = document.createElement("h3");
       heading.textContent = title;

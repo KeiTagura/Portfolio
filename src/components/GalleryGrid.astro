@@ -1,4 +1,5 @@
 ---
+import { getImage } from "astro:assets";
 import { getCollection } from "astro:content";
 import GalleryFilter from "@components/GalleryFilter.astro";
 import Lightbox from "@components/Lightbox.astro";
@@ -13,17 +14,105 @@ interface Props {
   variant?: "home" | "page";
 }
 
+type SourceImage = {
+  src: string;
+  width: number;
+  height: number;
+  format: "gif" | "svg" | "webp" | "avif" | "png" | "jpg" | "jpeg" | "tiff";
+};
+
 const { id, variant = "home" } = Astro.props;
 const showHeader = Astro.props.showHeader ?? variant === "home";
 const items = (await getCollection("gallery")).sort((a, b) => a.data.order - b.data.order);
-const visibleItems = variant === "home" ? items.slice(0, 6) : items;
 const ui = getUi();
+const galleryThumbnail = site.galleryThumbnail;
+const showGalleryThumbnailMeta =
+  galleryThumbnail.showTags || galleryThumbnail.showTitle || galleryThumbnail.showDescription;
+const sourceGalleryImages = import.meta.glob<{ default: SourceImage }>("/src/gallery/**/*.{avif,gif,jpeg,jpg,png,webp}", {
+  eager: true,
+});
 const masonryStyle = [
   `--masonry-mobile: ${site.galleryMasonry.mobile}`,
   `--masonry-tablet: ${site.galleryMasonry.tablet}`,
   `--masonry-desktop: ${site.galleryMasonry.desktop}`,
   `--masonry-wide: ${site.galleryMasonry.wide}`,
 ].join("; ");
+
+function withBaseIfNeeded(path: string) {
+  const base = import.meta.env.BASE_URL;
+
+  if (base !== "/" && path.startsWith(base)) {
+    return path;
+  }
+
+  return withBase(path);
+}
+
+function getSourceGalleryImage(mediaSrc: string) {
+  const normalizedPath = mediaSrc.startsWith("src/") ? `/${mediaSrc}` : mediaSrc;
+
+  return sourceGalleryImages[normalizedPath]?.default;
+}
+
+function getClosestAspectClass(width: number, height: number) {
+  const sourceRatio = width / height;
+  const buckets = [
+    { className: "gallery-aspect-portrait", ratio: 3 / 4 },
+    { className: "gallery-aspect-tall", ratio: 4 / 5 },
+    { className: "gallery-aspect-square", ratio: 1 },
+    { className: "gallery-aspect-wide", ratio: 16 / 10 },
+  ];
+
+  return buckets.reduce((closest, bucket) => {
+    const currentDistance = Math.abs(Math.log(sourceRatio / bucket.ratio));
+    const closestDistance = Math.abs(Math.log(sourceRatio / closest.ratio));
+
+    return currentDistance < closestDistance ? bucket : closest;
+  }).className;
+}
+
+function getFallbackAspectClass(mediaType: string) {
+  if (["localVideo", "youtube", "vimeo"].includes(mediaType)) {
+    return "gallery-aspect-wide";
+  }
+
+  return "gallery-aspect-square";
+}
+
+async function resolveGalleryMedia(item: (typeof items)[number]) {
+  const sourceImage = ["image", "gif"].includes(item.data.mediaType) ? getSourceGalleryImage(item.data.mediaSrc) : undefined;
+
+  if (!sourceImage) {
+    return {
+      ...item,
+      thumbnailSrc: withBase(item.data.thumbnail ?? item.data.mediaSrc),
+      mediaSrc: withBase(item.data.mediaSrc),
+      aspectClass: getFallbackAspectClass(item.data.mediaType),
+    };
+  }
+
+  const thumbnail = await getImage({
+    src: sourceImage,
+    width: Math.min(sourceImage.width, galleryThumbnail.generatedWidth),
+    format: galleryThumbnail.generatedFormat as "webp" | "avif" | "png" | "jpg" | "jpeg",
+    quality: galleryThumbnail.generatedQuality,
+  });
+  const fullImage = await getImage({
+    src: sourceImage,
+    width: Math.min(sourceImage.width, galleryThumbnail.fullImageMaxWidth),
+    quality: galleryThumbnail.fullImageQuality,
+  });
+
+  return {
+    ...item,
+    thumbnailSrc: withBaseIfNeeded(thumbnail.src),
+    mediaSrc: withBaseIfNeeded(fullImage.src),
+    aspectClass: getClosestAspectClass(sourceImage.width, sourceImage.height),
+  };
+}
+
+const resolvedItems = await Promise.all(items.map(resolveGalleryMedia));
+const visibleResolvedItems = variant === "home" ? resolvedItems.slice(0, 6) : resolvedItems;
 ---
 
 <section class:list={["page-section", "gallery-section", `section-${variant}`]} id={id}>
@@ -42,35 +131,50 @@ const masonryStyle = [
   {variant === "page" && <GalleryFilter />}
   <div class="gallery-grid" data-gallery-grid style={masonryStyle}>
     {
-      visibleItems.map((item, index) => (
-        <article class="gallery-item" data-gallery-item data-tags={item.data.tags.join("|")}>
-          <button
-            type="button"
-            class="gallery-media"
-            data-lightbox-trigger
-            data-lightbox-index={index}
-            data-media-type={item.data.mediaType}
-            data-media-src={withBase(item.data.mediaSrc)}
-            data-title={item.data.title}
-            data-description={item.data.description}
-            data-alt={`${item.data.title} media preview`}
-            aria-label={`${ui.common.openMedia}: ${item.data.title}`}
-          >
-            <img src={withBase(item.data.thumbnail)} alt={`${item.data.title} thumbnail`} loading="lazy" />
-            {item.data.mediaType !== "image" && <span class:list={["media-indicator", `media-${item.data.mediaType}`]}>{item.data.mediaType}</span>}
+      visibleResolvedItems.map((item, index) => {
+        const lightboxTitle = item.data.showLightboxTitle ? (item.data.lightboxTitle ?? item.data.title) : "";
+        const lightboxDescription = item.data.showLightboxDescription
+          ? (item.data.lightboxDescription ?? item.data.description)
+          : "";
+
+        return (
+          <article class:list={["gallery-item", item.aspectClass]} data-gallery-item data-tags={item.data.tags.join("|")}>
+            <button
+              type="button"
+              class="gallery-media"
+              data-lightbox-trigger
+              data-lightbox-index={index}
+              data-media-type={item.data.mediaType}
+              data-media-src={item.mediaSrc}
+              data-title={lightboxTitle}
+              data-description={lightboxDescription}
+              data-alt={`${item.data.title} media preview`}
+              aria-label={`${ui.common.openMedia}: ${item.data.title}`}
+            >
+              <img src={item.thumbnailSrc} alt={`${item.data.title} thumbnail`} loading="lazy" />
+              {
+                galleryThumbnail.showMediaType && item.data.mediaType !== "image" && (
+                  <span class:list={["media-indicator", `media-${item.data.mediaType}`]}>{item.data.mediaType}</span>
+                )
+              }
+              {
+                ["localVideo", "youtube", "vimeo"].includes(item.data.mediaType) && (
+                  <span class="play-indicator" aria-hidden="true"></span>
+                )
+              }
+            </button>
             {
-              ["localVideo", "youtube", "vimeo"].includes(item.data.mediaType) && (
-                <span class="play-indicator" aria-hidden="true"></span>
+              showGalleryThumbnailMeta && (
+                <div>
+                  {galleryThumbnail.showTags && item.data.tags.length > 0 && <span>{item.data.tags.join(" / ")}</span>}
+                  {galleryThumbnail.showTitle && <h3>{item.data.title}</h3>}
+                  {galleryThumbnail.showDescription && item.data.description && <p>{item.data.description}</p>}
+                </div>
               )
             }
-          </button>
-          <div>
-            <span>{item.data.tags.join(" / ")}</span>
-            <h3>{item.data.title}</h3>
-            <p>{item.data.description}</p>
-          </div>
-        </article>
-      ))
+          </article>
+        );
+      })
     }
   </div>
   <Lightbox />

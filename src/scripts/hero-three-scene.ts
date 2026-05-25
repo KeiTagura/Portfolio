@@ -1112,14 +1112,13 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   function getPixelSampleTargetSize(viewportWidth: number, viewportHeight: number, fullColumns: number) {
     const maxWidth = isSmallScreen ? 96 : 220;
     const maxHeight = isSmallScreen ? 80 : 140;
-    const aspect = viewportWidth / Math.max(1, viewportHeight);
-    let targetWidth = Math.max(16, Math.min(maxWidth, fullColumns));
-    let targetHeight = Math.max(12, Math.round(targetWidth / Math.max(0.1, aspect)));
-
-    if (targetHeight > maxHeight) {
-      targetHeight = maxHeight;
-      targetWidth = Math.max(16, Math.round(targetHeight * aspect));
-    }
+    const scale = Math.min(
+      maxWidth / Math.max(1, viewportWidth),
+      maxHeight / Math.max(1, viewportHeight),
+      fullColumns / Math.max(1, viewportWidth),
+    );
+    const targetWidth = Math.max(16, Math.round(viewportWidth * scale));
+    const targetHeight = Math.max(12, Math.round(viewportHeight * scale));
 
     return {
       targetWidth,

@@ -1,13 +1,14 @@
 export const links = {
-  email: "mailto:hello@example.com",
-  emailAddress: "hello@example.com",
-  github: "https://github.com/example",
-  artstation: "https://www.artstation.com/example",
-  itch: "https://example.itch.io",
-  linkedin: "https://www.linkedin.com/in/example",
-  youtube: "https://www.youtube.com/@example",
-  x: "https://x.com/example",
-  bluesky: "https://bsky.app/profile/example.bsky.social",
+  email: "mailto:GrantKlein@Outlook.jp",
+  emailAddress: "GrantKlein@Outlook.jp",
+  github: "https://github.com/KeiTagura",
+  portfolio: "https://keitagura.portfoliobox.net",
+  artstation: "",
+  itch: "",
+  linkedin: "",
+  youtube: "",
+  x: "",
+  bluesky: "",
   cv: "/cv.pdf",
 };
 
@@ -20,9 +21,9 @@ export const primaryContactLinks = [
     primary: true,
   },
   {
-    label: "LinkedIn",
-    href: links.linkedin,
-    detail: "Professional profile",
+    label: "Portfolio",
+    href: links.portfolio,
+    detail: "Project archive",
     kind: "profile",
     primary: true,
   },
@@ -39,7 +40,19 @@ export const profileLinks = [
   {
     label: "GitHub",
     href: links.github,
-    detail: "Tools, prototypes, and source samples",
+    detail: "Code, tools, and prototypes",
+    kind: "profile",
+  },
+  {
+    label: "Portfolio",
+    href: links.portfolio,
+    detail: "Visual and project portfolio",
+    kind: "profile",
+  },
+  {
+    label: "LinkedIn",
+    href: links.linkedin,
+    detail: "Professional profile",
     kind: "profile",
   },
   {
@@ -74,4 +87,4 @@ export const profileLinks = [
   },
 ];
 
-export const contactLinks = [...primaryContactLinks, ...profileLinks];
+export const contactLinks = [...primaryContactLinks, ...profileLinks].filter((link) => Boolean(link.href));
