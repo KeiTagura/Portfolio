@@ -54,4 +54,11 @@ const ui = getUi();
       </div>
     </div>
   </div>
+  {
+    variant === "home" && (
+      <div class="section-cta">
+        <a class="text-link" href={withBase("/about")}>{ui.sections.about.actionLabel}</a>
+      </div>
+    )
+  }
 </section>

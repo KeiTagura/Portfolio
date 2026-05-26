@@ -36,5 +36,12 @@ const ui = getUi();
   <div class="project-grid">
     {visibleProjects.map((project, index) => <ProjectCard project={project} variant={variant} index={index} />)}
   </div>
+  {
+    variant === "home" && (
+      <div class="section-cta">
+        <a class="text-link" href={withBase("/projects")}>{ui.sections.projects.actionLabel}</a>
+      </div>
+    )
+  }
   <ProjectLightbox projects={visibleProjects} />
 </section>

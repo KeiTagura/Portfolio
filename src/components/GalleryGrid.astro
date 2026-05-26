@@ -112,7 +112,7 @@ async function resolveGalleryMedia(item: (typeof items)[number]) {
 }
 
 const resolvedItems = await Promise.all(items.map(resolveGalleryMedia));
-const visibleResolvedItems = variant === "home" ? resolvedItems.slice(0, 6) : resolvedItems;
+const visibleResolvedItems = variant === "home" ? resolvedItems.slice(0, 10) : resolvedItems;
 ---
 
 <section class:list={["page-section", "gallery-section", `section-${variant}`]} id={id}>
@@ -177,6 +177,13 @@ const visibleResolvedItems = variant === "home" ? resolvedItems.slice(0, 6) : re
       })
     }
   </div>
+  {
+    variant === "home" && (
+      <div class="section-cta">
+        <a class="text-link" href={withBase("/gallery")}>{ui.sections.gallery.actionLabel}</a>
+      </div>
+    )
+  }
   <Lightbox />
 </section>
 
