@@ -22,15 +22,29 @@ const projects = defineCollection({
 
 const gallery = defineCollection({
   type: "content",
-  schema: z.object({
-    title: z.string(),
-    thumbnail: z.string(),
-    mediaType,
-    mediaSrc: z.string(),
-    tags: z.array(galleryTag).default([]),
-    description: z.string(),
-    order: z.number().default(0),
-  }),
+  schema: z
+    .object({
+      title: z.string(),
+      thumbnail: z.string().optional(),
+      mediaType,
+      mediaSrc: z.string(),
+      tags: z.array(galleryTag).default([]),
+      description: z.string().default(""),
+      lightboxTitle: z.string().optional(),
+      lightboxDescription: z.string().optional(),
+      showLightboxTitle: z.boolean().default(true),
+      showLightboxDescription: z.boolean().default(true),
+      order: z.number().default(0),
+    })
+    .superRefine((data, context) => {
+      if (data.mediaType !== "image" && !data.thumbnail) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["thumbnail"],
+          message: "Gallery items that are not images need a manually provided thumbnail.",
+        });
+      }
+    }),
 });
 
 const about = defineCollection({

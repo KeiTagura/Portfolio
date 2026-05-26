@@ -191,6 +191,9 @@ export const site = {
     fullImageMaxWidth: 1800,
     fullImageQuality: 86,
   },
+  projectThumbnail: {
+    showDescription: false,
+  },
   pageHeaders: {
     projects: {
       eyebrow: "Selected Work",

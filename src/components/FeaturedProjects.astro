@@ -16,7 +16,7 @@ const { id, variant = "home" } = Astro.props;
 const showHeader = Astro.props.showHeader ?? variant === "home";
 const allProjects = (await getCollection("projects")).sort((a, b) => a.data.order - b.data.order);
 const projects = variant === "home" ? allProjects.filter((project) => project.data.featured) : allProjects;
-const visibleProjects = variant === "home" ? projects.slice(0, 2) : projects;
+const visibleProjects = variant === "home" ? projects.slice(0, 4) : projects;
 const ui = getUi();
 ---
 

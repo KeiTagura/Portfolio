@@ -1,5 +1,6 @@
 ---
 import type { CollectionEntry } from "astro:content";
+import { site } from "@config/site";
 import { getUi } from "@data/ui";
 import { withBase } from "../utils/paths";
 
@@ -33,6 +34,6 @@ const ui = getUi();
       <span>{data.role}</span>
     </div>
     <h3>{data.title}</h3>
-    <p>{data.description}</p>
+    {site.projectThumbnail.showDescription && <p>{data.description}</p>}
   </div>
 </article>
