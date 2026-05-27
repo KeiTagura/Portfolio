@@ -70,6 +70,19 @@ body {
   }
 }
 
+@keyframes scroll-cue-float {
+  0%,
+  100% {
+    opacity: 0.58;
+    transform: translate(var(--scroll-cue-offset-x, -50%), 0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translate(var(--scroll-cue-offset-x, -50%), 8px);
+  }
+}
+
 ::view-transition-old(root) {
   animation: 160ms ease both page-fade-out;
 }
@@ -148,9 +161,17 @@ main {
 .brand-mark {
   width: 22px;
   height: 22px;
+  flex: 0 0 22px;
   border: 2px solid var(--accent);
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.brand-mark-image {
+  border: 0;
+  background: transparent;
+  clip-path: none;
+  object-fit: contain;
 }
 
 .nav-links {
@@ -186,6 +207,60 @@ main {
   height: 2px;
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
   content: "";
+}
+
+.nav-toggle {
+  display: none;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.nav-toggle:hover,
+.nav-toggle:focus-visible {
+  border-color: rgba(87, 213, 255, 0.34);
+  background: rgba(87, 213, 255, 0.1);
+}
+
+.nav-toggle span {
+  grid-area: 1 / 1;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.nav-toggle span:nth-child(1) {
+  transform: translateY(-6px);
+}
+
+.nav-toggle span:nth-child(3) {
+  transform: translateY(6px);
+}
+
+.site-nav[data-nav-open] .nav-toggle span:nth-child(1) {
+  transform: rotate(45deg);
+}
+
+.site-nav[data-nav-open] .nav-toggle span:nth-child(2) {
+  opacity: 0;
+}
+
+.site-nav[data-nav-open] .nav-toggle span:nth-child(3) {
+  transform: rotate(-45deg);
 }
 
 .hero {
@@ -404,6 +479,54 @@ h3 {
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 26px;
+}
+
+.hero-scroll-cue {
+  position: absolute;
+  inset: auto auto 24px 50%;
+  z-index: 2;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(8, 9, 13, 0.36);
+  color: var(--accent-2);
+  transform: translateX(var(--scroll-cue-offset-x, -50%));
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+  animation: scroll-cue-float 1.8s ease-in-out infinite;
+  backdrop-filter: blur(12px);
+  --scroll-cue-offset-x: -50%;
+}
+
+.hero-scroll-cue:hover,
+.hero-scroll-cue:focus-visible {
+  border-color: rgba(255, 207, 90, 0.46);
+  background: rgba(255, 207, 90, 0.12);
+  color: var(--text);
+  outline: none;
+}
+
+.hero-scroll-cue span {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.hero-scroll-cue span:first-child {
+  margin-top: -8px;
+  opacity: 0.58;
+}
+
+.hero-scroll-cue span:last-child {
+  margin-top: 5px;
 }
 
 .button,
@@ -1042,9 +1165,9 @@ h3 {
   width: min(1180px, 100%);
   min-height: calc(100vh - clamp(32px, 6vw, 68px));
   margin: 0 auto;
-  border: 1px solid var(--line);
+  border: 0px solid var(--line);
   border-radius: 8px;
-  background: rgba(13, 18, 26, 0.98);
+  background: rgba(13, 18, 26, 0);
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.45);
   outline: 0;
   overflow: hidden;
@@ -1058,7 +1181,7 @@ h3 {
   justify-content: flex-end;
   gap: 8px;
   border-bottom: 1px solid var(--line);
-  background: rgba(13, 18, 26, 0.92);
+  background: rgba(13, 18, 26, 0);
   padding: 12px;
   backdrop-filter: blur(12px);
 }
@@ -1088,7 +1211,7 @@ h3 {
 .project-lightbox-media iframe {
   width: min(100%, 1040px);
   max-height: 72vh;
-  border: 1px solid var(--line);
+  border: 0px solid var(--line);
   border-radius: 8px;
   background: #000;
 }
@@ -1390,13 +1513,56 @@ h3 {
 }
 
 @media (max-width: 900px) {
+  :root {
+    --nav-height: 64px;
+  }
+
   .site-nav {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+    min-height: 64px;
+    gap: 12px;
+    padding: 10px clamp(16px, 5vw, 28px);
+  }
+
+  .nav-toggle {
+    display: grid;
   }
 
   .nav-links {
-    justify-content: flex-start;
+    position: absolute;
+    inset: calc(100% - 1px) clamp(12px, 4vw, 24px) auto;
+    display: grid;
+    justify-content: stretch;
+    gap: 6px;
+    max-height: calc(100svh - 80px);
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(12, 15, 22, 0.96);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.34);
+    opacity: 0;
+    padding: 10px;
+    pointer-events: none;
+    transform: translateY(-8px);
+    transition:
+      opacity 160ms ease,
+      transform 160ms ease,
+      visibility 160ms ease;
+    visibility: hidden;
+  }
+
+  .site-nav[data-nav-open] .nav-links {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+    visibility: visible;
+  }
+
+  .nav-links a {
+    min-height: 42px;
+    align-items: center;
+    padding: 9px 10px;
   }
 
   .section-header,
@@ -1452,16 +1618,45 @@ h3 {
 }
 
 @media (max-width: 560px) {
-  :root {
-    --nav-height: 132px;
-  }
-
   .hero {
     min-height: calc(100svh - var(--nav-height));
+    align-items: end;
+    padding: clamp(44px, 12vw, 64px) 18px 32px;
   }
 
-  .nav-links a {
-    padding: 7px 8px;
+  .hero-content {
+    width: min(360px, 100%);
+    filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.5));
+  }
+
+  .hero-background-title {
+    font-size: var(--hero-background-title-mobile-font-size, var(--hero-background-title-font-size, clamp(2.8rem, 17vw, 5.5rem)));
+  }
+
+  .hero-content .eyebrow {
+    margin-bottom: 8px;
+    font-size: 0.66rem;
+    line-height: 1.35;
+  }
+
+  .hero h1 {
+    margin-bottom: 12px;
+    font-size: clamp(2.35rem, 13vw, 3.6rem);
+    line-height: 0.92;
+  }
+
+  .hero-copy {
+    max-width: 34ch;
+    margin-bottom: 0;
+    font-size: 0.94rem;
+    line-height: 1.45;
+  }
+
+  .hero-scroll-cue {
+    inset: auto 18px 18px auto;
+    width: 38px;
+    height: 38px;
+    --scroll-cue-offset-x: 0;
   }
 
   .project-lightbox {
@@ -1495,10 +1690,14 @@ h3 {
 
   .hero-actions {
     display: grid;
+    max-width: 220px;
+    margin-top: 16px;
   }
 
   .button {
+    min-height: 40px;
     justify-content: center;
+    padding: 9px 14px;
   }
 
   .project-body,
@@ -1550,7 +1749,8 @@ h3 {
 
   body,
   ::view-transition-old(root),
-  ::view-transition-new(root) {
+  ::view-transition-new(root),
+  .hero-scroll-cue {
     animation: none !important;
   }
 
