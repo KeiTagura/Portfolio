@@ -11,12 +11,30 @@ const pathWithoutBase =
 const currentPath = pathWithoutBase.replace(/\/$/, "") || "/";
 ---
 
-<header class="site-nav">
+<header class="site-nav" data-site-nav>
   <a class="nav-brand" href={withBase("/")} aria-label={`${site.name} home`}>
-    <span class="brand-mark" aria-hidden="true"></span>
+    {
+      site.navBrand.image ? (
+        <img class="brand-mark brand-mark-image" src={withBase(site.navBrand.image)} alt="" aria-hidden="true" />
+      ) : (
+        <span class="brand-mark" aria-hidden="true"></span>
+      )
+    }
     <span>{site.author}</span>
   </a>
-  <nav class="nav-links" aria-label="Primary navigation">
+  <button
+    class="nav-toggle"
+    type="button"
+    aria-label="Toggle navigation menu"
+    aria-expanded="false"
+    aria-controls="primary-navigation"
+    data-nav-toggle
+  >
+    <span aria-hidden="true"></span>
+    <span aria-hidden="true"></span>
+    <span aria-hidden="true"></span>
+  </button>
+  <nav id="primary-navigation" class="nav-links" aria-label="Primary navigation" data-nav-links>
     {
       navItems.map((item) => {
         const normalizedHref = item.href.replace(/\/$/, "") || "/";
@@ -30,3 +48,64 @@ const currentPath = pathWithoutBase.replace(/\/$/, "") || "/";
     }
   </nav>
 </header>
+
+<script>
+  function setupMobileNav() {
+    const nav = document.querySelector<HTMLElement>("[data-site-nav]");
+
+    if (!nav || nav.dataset.navReady === "true") {
+      return;
+    }
+
+    const toggle = nav.querySelector<HTMLButtonElement>("[data-nav-toggle]");
+    const links = nav.querySelector<HTMLElement>("[data-nav-links]");
+
+    if (!toggle || !links) {
+      return;
+    }
+
+    nav.dataset.navReady = "true";
+
+    const setOpen = (isOpen: boolean) => {
+      nav.toggleAttribute("data-nav-open", isOpen);
+      toggle.setAttribute("aria-expanded", String(isOpen));
+    };
+
+    toggle.addEventListener("click", () => {
+      setOpen(!nav.hasAttribute("data-nav-open"));
+    });
+
+    links.querySelectorAll("a").forEach((link) => {
+      link.addEventListener("click", () => setOpen(false));
+    });
+
+    nav.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+
+  }
+
+  const navWindow = window as Window & { __portfolioMobileNavGlobals?: boolean };
+
+  setupMobileNav();
+
+  if (!navWindow.__portfolioMobileNavGlobals) {
+    navWindow.__portfolioMobileNavGlobals = true;
+
+    document.addEventListener("click", (event) => {
+      const openNav = document.querySelector<HTMLElement>("[data-site-nav][data-nav-open]");
+
+      if (!openNav || openNav.contains(event.target as Node)) {
+        return;
+      }
+
+      openNav.removeAttribute("data-nav-open");
+      openNav.querySelector("[data-nav-toggle]")?.setAttribute("aria-expanded", "false");
+    });
+
+    document.addEventListener("astro:page-load", setupMobileNav);
+  }
+</script>

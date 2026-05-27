@@ -12,7 +12,15 @@ export const links = {
   cv: "/cv.pdf",
 };
 
-export const primaryContactLinks = [
+export type ContactLink = {
+  label: string;
+  href: string;
+  detail: string;
+  kind?: "download" | "email" | "profile";
+  primary?: boolean;
+};
+
+export const primaryContactLinks: ContactLink[] = [
   {
     label: "Download CV",
     href: links.cv,
@@ -20,12 +28,11 @@ export const primaryContactLinks = [
     kind: "download",
     primary: true,
   },
-  {
-    label: "Portfolio",
-    href: links.portfolio,
-    detail: "Project archive",
+   {
+    label: "GitHub",
+    href: links.github,
+    detail: "Code, tools, and prototypes",
     kind: "profile",
-    primary: true,
   },
   {
     label: "Email",
@@ -36,7 +43,8 @@ export const primaryContactLinks = [
   },
 ];
 
-export const profileLinks = [
+export const profileLinks: ContactLink[] = [
+  /*
   {
     label: "GitHub",
     href: links.github,
@@ -85,6 +93,7 @@ export const profileLinks = [
     detail: "Social updates and work in progress",
     kind: "profile",
   },
+  */
 ];
 
 export const contactLinks = [...primaryContactLinks, ...profileLinks].filter((link) => Boolean(link.href));

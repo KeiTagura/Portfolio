@@ -1,15 +1,19 @@
 const configuredSiteUrl = import.meta.env.PUBLIC_SITE_URL;
 
 export const site = {
-  name: "Grant Klein Portfolio",
-  title: "Grant Klein | Senior Programmer & Technical Artist",
+  name: "Klein Grant Portfolio",
+  title: "Klein Grant | Senior Programmer & Technical Artist",
   description:
-    "A visual portfolio for a senior programmer and technical artist focused on Unity, Unreal Engine, VR/AR, tooling, shaders, and web platforms.",
+    "10+ years of experience as a senior programmer and technical artist across game development, VR/AR, tooling, shaders, and web platforms.",
   url: configuredSiteUrl || "https://kakem.github.io/portfolio-kei",
-  author: "Grant Klein",
+  author: "Klein Grant",
   locale: "en_US",
   ogImage: "/og-image.jpg",
-  favicon: "/favicon.svg",
+  favicon: "/src/logo.png",
+  navBrand: {
+    image: "/src/logo.png",
+    imageAlt: "Klein Grant logo",
+  },
   heroVisual: {
     enabled: true,
     mode: "three-ascii-split",
@@ -49,7 +53,7 @@ export const site = {
         z: 0,
       },
     },
-    fallbackImage: "/media/hero/hero-fallback.webp",
+    fallbackImage: "/media/hero/hero-fallback.png",
     fallbackTint: {
       color: "rgba(87, 213, 255, 0.22)",
       blendMode: "multiply",
@@ -60,11 +64,12 @@ export const site = {
     },
     backgroundTitle: {
       enabled: true,
-      text: "ART // CODE",
+      text: "ART & CODE;",
       normalColor: "rgba(244, 247, 251, 1)",
       asciiColor: "rgba(87, 213, 255, 1)",
       opacity: 1,
       fontSize: "clamp(5rem, 16vw, 13rem)",
+      mobileFontSize: "clamp(2.8rem, 17vw, 5.5rem)",
       x: "0%",
       y: "-30%",
     },
@@ -142,7 +147,7 @@ export const site = {
   pages: {
     home: {
       path: "/",
-      title: "Grant Klein | Senior Programmer & Technical Artist",
+      title: "Klein Grant | Senior Programmer & Technical Artist",
       description:
         "A visual portfolio for Unity, Unreal Engine, VR/AR, technical art, tooling, and full-stack web development work.",
     },
@@ -175,9 +180,9 @@ export const site = {
     },
   },
   galleryMasonry: {
-    mobile: 1,
+    mobile: 2,
     tablet: 2,
-    desktop: 3,
+    desktop: 4,
     wide: 4,
   },
   galleryThumbnail: {
@@ -194,13 +199,17 @@ export const site = {
   projectThumbnail: {
     showDescription: false,
   },
+  experienceTimeline: {
+    homeLimit: 2,
+    pageLimit: null,
+  },
   pageHeaders: {
     projects: {
       eyebrow: "Selected Work",
       title: "Featured Projects",
       intro:
         "Selected projects highlighting my work in game development, technical art, tools, shaders, optimization, and interactive media.",
-      backgroundImage: "/media/page-bg/projects-bg.svg",
+      backgroundImage: "/src/featuredHeader.png",
       backgroundAlt: "Abstract project showcase background",
       visualAccent: "#57d5ff",
     },
@@ -209,7 +218,7 @@ export const site = {
       title: "Gallery",
       intro:
         "A visual collection of environments, characters, animation tests, editor tools, 3D assets, pixel art, GIFs, and video work.",
-      backgroundImage: "/media/page-bg/gallery-bg.svg",
+      backgroundImage: "/src/visualHeader.png",
       backgroundAlt: "Abstract gallery contact sheet background",
       visualAccent: "#ffcf5a",
     },
