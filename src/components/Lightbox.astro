@@ -6,9 +6,13 @@ const ui = getUi();
 
 <div class="lightbox" data-lightbox hidden>
   <div class="lightbox-panel" data-lightbox-panel role="dialog" aria-modal="true" tabindex="-1">
+    <button class="lightbox-side-nav lightbox-side-nav-prev" type="button" data-lightbox-prev aria-label={`${ui.common.previous} gallery item`}>
+      <span aria-hidden="true">‹</span>
+    </button>
+    <button class="lightbox-side-nav lightbox-side-nav-next" type="button" data-lightbox-next aria-label={`${ui.common.next} gallery item`}>
+      <span aria-hidden="true">›</span>
+    </button>
     <div class="lightbox-toolbar">
-      <button type="button" data-lightbox-prev aria-label={`${ui.common.previous} gallery item`}>{ui.common.previous}</button>
-      <button type="button" data-lightbox-next aria-label={`${ui.common.next} gallery item`}>{ui.common.next}</button>
       <button class="lightbox-close" type="button" data-lightbox-close aria-label={ui.common.closePreview}>
         {ui.common.closePreview}
       </button>
@@ -27,172 +31,304 @@ const ui = getUi();
 </div>
 
 <script>
-  const lightbox = document.querySelector("[data-lightbox]");
-  const lightboxPanel = document.querySelector("[data-lightbox-panel]");
-  const lightboxImage = document.querySelector("[data-lightbox-image]");
-  const lightboxVideo = document.querySelector("[data-lightbox-video]");
-  const lightboxEmbed = document.querySelector("[data-lightbox-embed]");
-  const lightboxExternal = document.querySelector("[data-lightbox-external]");
-  const lightboxExternalLabel = document.querySelector("[data-lightbox-external-label]");
-  const lightboxCaption = document.querySelector("[data-lightbox-caption]");
-  const closeButton = document.querySelector("[data-lightbox-close]");
-  const prevButton = document.querySelector("[data-lightbox-prev]");
-  const nextButton = document.querySelector("[data-lightbox-next]");
-  const galleryTriggers = Array.from(document.querySelectorAll("[data-lightbox-trigger]"));
-  let currentGalleryIndex = 0;
-  let previousFocus: Element | null = null;
+  function setupGalleryLightbox() {
+    const lightbox = document.querySelector<HTMLElement>("[data-lightbox]");
+    const galleryTriggers = Array.from(document.querySelectorAll("[data-lightbox-trigger]"));
 
-  function resetLightboxMedia() {
-    if (lightboxImage instanceof HTMLImageElement) {
-      lightboxImage.hidden = true;
-      lightboxImage.removeAttribute("src");
+    if (!lightbox || lightbox.dataset.lightboxReady === "true" || galleryTriggers.length === 0) {
+      return;
     }
-    if (lightboxVideo instanceof HTMLVideoElement) {
-      lightboxVideo.hidden = true;
-      lightboxVideo.pause();
-      lightboxVideo.removeAttribute("src");
-      lightboxVideo.load();
-    }
-    if (lightboxEmbed instanceof HTMLIFrameElement) {
-      lightboxEmbed.hidden = true;
-      lightboxEmbed.removeAttribute("src");
-    }
-    if (lightboxExternal instanceof HTMLAnchorElement) {
-      lightboxExternal.hidden = true;
-      lightboxExternal.href = "#";
-    }
-  }
 
-  function getVisibleTriggers() {
-    return galleryTriggers.filter((trigger) => {
+    const activeLightbox = lightbox;
+    const lightboxPanel = activeLightbox.querySelector<HTMLElement>("[data-lightbox-panel]");
+    const lightboxImage = activeLightbox.querySelector<HTMLImageElement>("[data-lightbox-image]");
+    const lightboxVideo = activeLightbox.querySelector<HTMLVideoElement>("[data-lightbox-video]");
+    const lightboxEmbed = activeLightbox.querySelector<HTMLIFrameElement>("[data-lightbox-embed]");
+    const lightboxExternal = activeLightbox.querySelector<HTMLAnchorElement>("[data-lightbox-external]");
+    const lightboxExternalLabel = activeLightbox.querySelector<HTMLElement>("[data-lightbox-external-label]");
+    const lightboxCaption = activeLightbox.querySelector<HTMLElement>("[data-lightbox-caption]");
+    const closeButton = activeLightbox.querySelector("[data-lightbox-close]");
+    const prevButton = activeLightbox.querySelector("[data-lightbox-prev]");
+    const nextButton = activeLightbox.querySelector("[data-lightbox-next]");
+    let currentGalleryIndex = 0;
+    let previousFocus: Element | null = null;
+    let isLightboxTransitioning = false;
+    let swipeStartX = 0;
+    let swipeStartY = 0;
+    let swipePointerId: number | null = null;
+    let lastSwipeAt = 0;
+
+    activeLightbox.dataset.lightboxReady = "true";
+
+    function resetLightboxMedia() {
+      if (lightboxImage) {
+        lightboxImage.hidden = true;
+        lightboxImage.removeAttribute("src");
+      }
+      if (lightboxVideo) {
+        lightboxVideo.hidden = true;
+        lightboxVideo.pause();
+        lightboxVideo.removeAttribute("src");
+        lightboxVideo.load();
+      }
+      if (lightboxEmbed) {
+        lightboxEmbed.hidden = true;
+        lightboxEmbed.removeAttribute("src");
+      }
+      if (lightboxExternal) {
+        lightboxExternal.hidden = true;
+        lightboxExternal.href = "#";
+      }
+    }
+
+    function getVisibleTriggers() {
+      return galleryTriggers.filter((trigger) => {
+        if (!(trigger instanceof HTMLElement)) {
+          return false;
+        }
+        const item = trigger.closest("[data-gallery-item]");
+        return !(item instanceof HTMLElement) || !item.hidden;
+      });
+    }
+
+    function renderLightboxMedia(trigger: HTMLElement) {
+      resetLightboxMedia();
+      const mediaType = trigger.getAttribute("data-media-type") ?? "image";
+      const mediaSrc = trigger.getAttribute("data-media-src") ?? "";
+      const alt = trigger.getAttribute("data-alt") ?? "";
+      const title = trigger.getAttribute("data-title") ?? "Gallery item";
+
+      if ((mediaType === "image" || mediaType === "gif") && lightboxImage) {
+        lightboxImage.src = mediaSrc;
+        lightboxImage.alt = alt;
+        lightboxImage.hidden = false;
+        return;
+      }
+
+      if (mediaType === "localVideo" && lightboxVideo) {
+        lightboxVideo.src = mediaSrc;
+        lightboxVideo.muted = true;
+        lightboxVideo.hidden = false;
+        return;
+      }
+
+      if ((mediaType === "youtube" || mediaType === "vimeo") && lightboxEmbed) {
+        lightboxEmbed.src = mediaSrc;
+        lightboxEmbed.title = `${title} embedded media`;
+        lightboxEmbed.hidden = false;
+        return;
+      }
+
+      if (lightboxExternal) {
+        lightboxExternal.href = mediaSrc;
+        lightboxExternal.hidden = false;
+      }
+      if (lightboxExternalLabel) {
+        lightboxExternalLabel.textContent = `Open ${mediaType} media`;
+      }
+    }
+
+    function renderLightboxCaption(trigger: HTMLElement) {
+      if (!lightboxCaption) {
+        return;
+      }
+      const title = trigger.getAttribute("data-title") ?? "";
+      const description = trigger.getAttribute("data-description") ?? "";
+      const hasCaption = Boolean(title || description);
+      lightboxCaption.replaceChildren();
+      lightboxCaption.hidden = !hasCaption;
+      lightboxPanel?.classList.toggle("has-empty-caption", !hasCaption);
+      if (title) {
+        const heading = document.createElement("h3");
+        heading.textContent = title;
+        lightboxCaption.append(heading);
+      }
+      if (description) {
+        const copy = document.createElement("p");
+        copy.textContent = description;
+        lightboxCaption.append(copy);
+      }
+    }
+
+    function setLightboxContent(index: number, trigger: HTMLElement) {
+      currentGalleryIndex = index;
+      renderLightboxMedia(trigger);
+      renderLightboxCaption(trigger);
+    }
+
+    function animateLightboxTo(index: number, trigger: HTMLElement) {
+      if (!lightboxPanel || isLightboxTransitioning) {
+        setLightboxContent(index, trigger);
+        return;
+      }
+
+      isLightboxTransitioning = true;
+      lightboxPanel.classList.add("is-changing");
+      window.setTimeout(() => {
+        setLightboxContent(index, trigger);
+        window.requestAnimationFrame(() => {
+          lightboxPanel.classList.remove("is-changing");
+          isLightboxTransitioning = false;
+        });
+      }, 140);
+    }
+
+    function openLightbox(index: number, animate = false) {
+      const visibleTriggers = getVisibleTriggers();
+      if (visibleTriggers.length === 0) {
+        return;
+      }
+      const normalizedIndex = (index + visibleTriggers.length) % visibleTriggers.length;
+      const trigger = visibleTriggers[normalizedIndex];
       if (!(trigger instanceof HTMLElement)) {
+        return;
+      }
+
+      const isAlreadyOpen = !activeLightbox.hasAttribute("hidden");
+      if (animate && isAlreadyOpen) {
+        animateLightboxTo(normalizedIndex, trigger);
+        return;
+      }
+
+      currentGalleryIndex = normalizedIndex;
+      previousFocus = document.activeElement;
+      setLightboxContent(normalizedIndex, trigger);
+      activeLightbox.removeAttribute("hidden");
+      document.body.classList.add("has-lightbox");
+      lightboxPanel?.focus();
+    }
+
+    function closeLightbox() {
+      resetLightboxMedia();
+      activeLightbox.setAttribute("hidden", "");
+      document.body.classList.remove("has-lightbox");
+      if (previousFocus instanceof HTMLElement) {
+        previousFocus.focus();
+      }
+    }
+
+    function moveLightbox(direction: number) {
+      openLightbox(currentGalleryIndex + direction, true);
+    }
+
+    function isSwipeControlTarget(target: EventTarget | null) {
+      return target instanceof Element && Boolean(target.closest("button, a, video, iframe"));
+    }
+
+    function startSwipe(clientX: number, clientY: number, target: EventTarget | null) {
+      if (isSwipeControlTarget(target)) {
         return false;
       }
-      const item = trigger.closest("[data-gallery-item]");
-      return !(item instanceof HTMLElement) || !item.hidden;
+
+      swipeStartX = clientX;
+      swipeStartY = clientY;
+      return true;
+    }
+
+    function finishSwipe(clientX: number, clientY: number) {
+      const deltaX = clientX - swipeStartX;
+      const deltaY = clientY - swipeStartY;
+
+      if (Math.abs(deltaX) < 40 || Math.abs(deltaX) < Math.abs(deltaY) * 1.15) {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastSwipeAt < 260) {
+        return;
+      }
+
+      lastSwipeAt = now;
+      moveLightbox(deltaX > 0 ? -1 : 1);
+    }
+
+    galleryTriggers.forEach((trigger) => {
+      trigger.addEventListener("click", () => {
+        const visibleTriggers = getVisibleTriggers();
+        openLightbox(visibleTriggers.indexOf(trigger));
+      });
     });
-  }
 
-  function renderLightboxMedia(trigger: HTMLElement) {
-    resetLightboxMedia();
-    const mediaType = trigger.getAttribute("data-media-type") ?? "image";
-    const mediaSrc = trigger.getAttribute("data-media-src") ?? "";
-    const alt = trigger.getAttribute("data-alt") ?? "";
-    const title = trigger.getAttribute("data-title") ?? "Gallery item";
+    closeButton?.addEventListener("click", closeLightbox);
+    prevButton?.addEventListener("click", () => moveLightbox(-1));
+    nextButton?.addEventListener("click", () => moveLightbox(1));
+    lightboxPanel?.addEventListener("pointerdown", (event) => {
+      if (!(event instanceof PointerEvent) || event.pointerType === "mouse") {
+        return;
+      }
 
-    if ((mediaType === "image" || mediaType === "gif") && lightboxImage instanceof HTMLImageElement) {
-      lightboxImage.src = mediaSrc;
-      lightboxImage.alt = alt;
-      lightboxImage.hidden = false;
-      return;
-    }
-
-    if (mediaType === "localVideo" && lightboxVideo instanceof HTMLVideoElement) {
-      lightboxVideo.src = mediaSrc;
-      lightboxVideo.muted = true;
-      lightboxVideo.hidden = false;
-      return;
-    }
-
-    if ((mediaType === "youtube" || mediaType === "vimeo") && lightboxEmbed instanceof HTMLIFrameElement) {
-      lightboxEmbed.src = mediaSrc;
-      lightboxEmbed.title = `${title} embedded media`;
-      lightboxEmbed.hidden = false;
-      return;
-    }
-
-    if (lightboxExternal instanceof HTMLAnchorElement) {
-      lightboxExternal.href = mediaSrc;
-      lightboxExternal.hidden = false;
-    }
-    if (lightboxExternalLabel instanceof HTMLElement) {
-      lightboxExternalLabel.textContent = `Open ${mediaType} media`;
-    }
-  }
-
-  function renderLightboxCaption(trigger: HTMLElement) {
-    if (!(lightboxCaption instanceof HTMLElement)) {
-      return;
-    }
-    const title = trigger.getAttribute("data-title") ?? "";
-    const description = trigger.getAttribute("data-description") ?? "";
-    const hasCaption = Boolean(title || description);
-    lightboxCaption.replaceChildren();
-    lightboxCaption.hidden = !hasCaption;
-    lightboxPanel instanceof HTMLElement && lightboxPanel.classList.toggle("has-empty-caption", !hasCaption);
-    if (title) {
-      const heading = document.createElement("h3");
-      heading.textContent = title;
-      lightboxCaption.append(heading);
-    }
-    if (description) {
-      const copy = document.createElement("p");
-      copy.textContent = description;
-      lightboxCaption.append(copy);
-    }
-  }
-
-  function openLightbox(index: number) {
-    const visibleTriggers = getVisibleTriggers();
-    if (visibleTriggers.length === 0) {
-      return;
-    }
-    const normalizedIndex = (index + visibleTriggers.length) % visibleTriggers.length;
-    const trigger = visibleTriggers[normalizedIndex];
-    if (!(trigger instanceof HTMLElement)) {
-      return;
-    }
-
-    currentGalleryIndex = normalizedIndex;
-    previousFocus = document.activeElement;
-    renderLightboxMedia(trigger);
-    renderLightboxCaption(trigger);
-    lightbox?.removeAttribute("hidden");
-    document.body.classList.add("has-lightbox");
-    if (lightboxPanel instanceof HTMLElement) {
-      lightboxPanel.focus();
-    }
-  }
-
-  function closeLightbox() {
-    resetLightboxMedia();
-    lightbox?.setAttribute("hidden", "");
-    document.body.classList.remove("has-lightbox");
-    if (previousFocus instanceof HTMLElement) {
-      previousFocus.focus();
-    }
-  }
-
-  function moveLightbox(direction: number) {
-    openLightbox(currentGalleryIndex + direction);
-  }
-
-  galleryTriggers.forEach((trigger) => {
-    trigger.addEventListener("click", () => {
-      const visibleTriggers = getVisibleTriggers();
-      openLightbox(visibleTriggers.indexOf(trigger));
+      if (!startSwipe(event.clientX, event.clientY, event.target)) {
+        return;
+      }
+      swipePointerId = event.pointerId;
     });
-  });
+    lightboxPanel?.addEventListener("pointerup", (event) => {
+      if (!(event instanceof PointerEvent) || swipePointerId !== event.pointerId) {
+        return;
+      }
 
-  closeButton?.addEventListener("click", closeLightbox);
-  prevButton?.addEventListener("click", () => moveLightbox(-1));
-  nextButton?.addEventListener("click", () => moveLightbox(1));
-  lightbox?.addEventListener("click", (event) => {
-    if (event.target === lightbox) {
-      closeLightbox();
-    }
-  });
-  document.addEventListener("keydown", (event) => {
-    if (lightbox?.hasAttribute("hidden")) {
-      return;
-    }
+      swipePointerId = null;
+      finishSwipe(event.clientX, event.clientY);
+    });
+    lightboxPanel?.addEventListener("pointercancel", (event) => {
+      if (event instanceof PointerEvent && swipePointerId === event.pointerId) {
+        swipePointerId = null;
+      }
+    });
+    lightboxPanel?.addEventListener(
+      "touchstart",
+      (event) => {
+        if (event.touches.length !== 1) {
+          return;
+        }
 
-    if (event.key === "Escape") {
-      closeLightbox();
-    } else if (event.key === "ArrowLeft") {
-      moveLightbox(-1);
-    } else if (event.key === "ArrowRight") {
-      moveLightbox(1);
+        const touch = event.touches[0];
+        startSwipe(touch.clientX, touch.clientY, event.target);
+      },
+      { passive: true },
+    );
+    lightboxPanel?.addEventListener(
+      "touchend",
+      (event) => {
+        const touch = event.changedTouches[0];
+        if (!touch || isSwipeControlTarget(event.target)) {
+          return;
+        }
+
+        finishSwipe(touch.clientX, touch.clientY);
+      },
+      { passive: true },
+    );
+    activeLightbox.addEventListener("click", (event) => {
+      if (event.target === activeLightbox) {
+        closeLightbox();
+      }
+    });
+
+    const pageWindow = window as Window & { __portfolioGalleryLightboxKeydown?: boolean };
+    if (!pageWindow.__portfolioGalleryLightboxKeydown) {
+      pageWindow.__portfolioGalleryLightboxKeydown = true;
+      document.addEventListener("keydown", (event) => {
+        const activeLightbox = document.querySelector<HTMLElement>("[data-lightbox]:not([hidden])");
+        if (!activeLightbox) {
+          return;
+        }
+
+        const activePrevButton = activeLightbox.querySelector<HTMLButtonElement>("[data-lightbox-prev]");
+        const activeNextButton = activeLightbox.querySelector<HTMLButtonElement>("[data-lightbox-next]");
+        const activeCloseButton = activeLightbox.querySelector<HTMLButtonElement>("[data-lightbox-close]");
+
+        if (event.key === "Escape") {
+          activeCloseButton?.click();
+        } else if (event.key === "ArrowLeft") {
+          activePrevButton?.click();
+        } else if (event.key === "ArrowRight") {
+          activeNextButton?.click();
+        }
+      });
     }
-  });
+  }
+
+  setupGalleryLightbox();
+  document.addEventListener("astro:page-load", setupGalleryLightbox);
 </script>

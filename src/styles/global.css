@@ -580,7 +580,7 @@ h3 {
   --page-accent: var(--accent);
   position: relative;
   display: grid;
-  min-height: clamp(330px, 42vw, 520px);
+  min-height: clamp(190px, 22vw, 280px);
   align-items: end;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -590,7 +590,7 @@ h3 {
     linear-gradient(0deg, rgba(255, 255, 255, 0.04), transparent),
     var(--bg-soft);
   margin-top: clamp(28px, 5vw, 56px);
-  padding: clamp(34px, 6vw, 72px);
+  padding: clamp(24px, 4vw, 44px);
   box-shadow: var(--shadow-soft);
 }
 
@@ -647,7 +647,8 @@ h3 {
 }
 
 .page-header h1 {
-  font-size: clamp(2.8rem, 7vw, 5.8rem);
+  font-size: clamp(2.2rem, 5vw, 4.2rem);
+  margin-bottom: 10px;
 }
 
 .section-header {
@@ -1038,6 +1039,7 @@ h3 {
 }
 
 .lightbox-panel {
+  position: relative;
   width: min(1080px, 100%);
   min-height: calc(100vh - clamp(28px, 6vw, 68px));
   margin: 0 auto;
@@ -1046,6 +1048,7 @@ h3 {
   background: rgba(13, 18, 26, 0.98);
   outline: 0;
   overflow: hidden;
+  touch-action: pan-y;
 }
 
 .lightbox-panel.has-empty-caption {
@@ -1055,7 +1058,7 @@ h3 {
 .lightbox-toolbar {
   position: sticky;
   top: 0;
-  z-index: 3;
+  z-index: 6;
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -1075,6 +1078,87 @@ h3 {
   padding: 9px 12px;
 }
 
+.lightbox-side-nav,
+.project-lightbox-side-nav {
+  position: absolute;
+  top: 58px;
+  z-index: 5;
+  display: grid;
+  width: min(19%, 170px);
+  height: clamp(260px, 58vw, 640px);
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: rgba(244, 247, 251, 0.72);
+  cursor: pointer;
+  opacity: 0.72;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
+}
+
+.lightbox-side-nav span,
+.project-lightbox-side-nav span {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(8, 9, 13, 0.42);
+  font-size: 0;
+  line-height: 1;
+  backdrop-filter: blur(12px);
+}
+
+.lightbox-side-nav span::before,
+.project-lightbox-side-nav span::before {
+  font-size: 2.4rem;
+  line-height: 1;
+  transform: translateY(-3.5px);
+}
+
+.lightbox-side-nav-prev span::before,
+.project-lightbox-side-nav-prev span::before {
+  content: "\2039";
+}
+
+.lightbox-side-nav-next span::before,
+.project-lightbox-side-nav-next span::before {
+  content: "\203a";
+}
+
+.lightbox-side-nav-prev,
+.project-lightbox-side-nav-prev {
+  left: 0;
+}
+
+.lightbox-side-nav-next,
+.project-lightbox-side-nav-next {
+  right: 0;
+}
+
+.lightbox-side-nav-prev:hover,
+.lightbox-side-nav-prev:focus-visible,
+.project-lightbox-side-nav-prev:hover,
+.project-lightbox-side-nav-prev:focus-visible {
+  background: linear-gradient(90deg, rgba(87, 213, 255, 0.2), transparent);
+  color: var(--text);
+  opacity: 1;
+  outline: none;
+}
+
+.lightbox-side-nav-next:hover,
+.lightbox-side-nav-next:focus-visible,
+.project-lightbox-side-nav-next:hover,
+.project-lightbox-side-nav-next:focus-visible {
+  background: linear-gradient(270deg, rgba(255, 207, 90, 0.2), transparent);
+  color: var(--text);
+  opacity: 1;
+  outline: none;
+}
+
 .lightbox-media {
   display: grid;
   min-height: clamp(260px, 58vw, 640px);
@@ -1085,6 +1169,23 @@ h3 {
   padding: clamp(14px, 3vw, 28px);
 }
 
+.lightbox-media,
+.lightbox-caption,
+.project-lightbox-media,
+.project-lightbox-details {
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+.lightbox-panel.is-changing .lightbox-media,
+.lightbox-panel.is-changing .lightbox-caption,
+.project-lightbox-panel.is-changing .project-lightbox-media,
+.project-lightbox-panel.is-changing .project-lightbox-details {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
 .lightbox img,
 .lightbox video,
 .lightbox iframe {
@@ -1093,6 +1194,13 @@ h3 {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #000;
+}
+
+.lightbox img {
+  width: auto;
+  max-width: min(100%, 980px);
+  height: auto;
+  object-fit: contain;
 }
 
 .lightbox iframe {
@@ -1162,26 +1270,28 @@ h3 {
 }
 
 .project-lightbox-panel {
+  position: relative;
   width: min(1180px, 100%);
   min-height: calc(100vh - clamp(32px, 6vw, 68px));
   margin: 0 auto;
-  border: 0px solid var(--line);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(13, 18, 26, 0);
+  background: rgba(13, 18, 26, 0.98);
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.45);
   outline: 0;
   overflow: hidden;
+  touch-action: pan-y;
 }
 
 .project-lightbox-toolbar {
   position: sticky;
   top: 0;
-  z-index: 3;
+  z-index: 6;
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   border-bottom: 1px solid var(--line);
-  background: rgba(13, 18, 26, 0);
+  background: rgba(13, 18, 26, 0.92);
   padding: 12px;
   backdrop-filter: blur(12px);
 }
@@ -1194,6 +1304,10 @@ h3 {
   cursor: pointer;
   font-weight: 800;
   padding: 9px 12px;
+}
+
+.project-lightbox-side-nav {
+  height: clamp(260px, 58vw, 660px);
 }
 
 .project-lightbox-media {
@@ -1211,9 +1325,16 @@ h3 {
 .project-lightbox-media iframe {
   width: min(100%, 1040px);
   max-height: 72vh;
-  border: 0px solid var(--line);
+  border: 1px solid var(--line);
   border-radius: 8px;
   background: #000;
+}
+
+.project-lightbox-media img {
+  width: auto;
+  max-width: min(100%, 1040px);
+  height: auto;
+  object-fit: contain;
 }
 
 .project-lightbox-media iframe {
@@ -1580,8 +1701,8 @@ h3 {
   }
 
   .page-header {
-    min-height: 360px;
-    padding: 28px;
+    min-height: 220px;
+    padding: 24px;
   }
 
   .hero {
@@ -1668,24 +1789,41 @@ h3 {
   }
 
   .project-lightbox-toolbar {
-    justify-content: stretch;
+    justify-content: flex-end;
   }
 
   .lightbox-toolbar {
-    justify-content: stretch;
+    justify-content: flex-end;
   }
 
   .project-lightbox-toolbar button,
   .lightbox-toolbar button {
-    flex: 1 1 0;
+    flex: 0 0 auto;
     min-width: 0;
     padding-inline: 8px;
   }
 
+  .lightbox-side-nav,
+  .project-lightbox-side-nav {
+    top: 54px;
+    width: 64px;
+  }
+
+  .lightbox-side-nav span,
+  .project-lightbox-side-nav span {
+    width: 38px;
+    height: 38px;
+  }
+
+  .lightbox-side-nav span::before,
+  .project-lightbox-side-nav span::before {
+    font-size: 2rem;
+  }
+
   .page-header {
     width: min(var(--max-width), calc(100% - 24px));
-    min-height: 330px;
-    padding: 24px;
+    min-height: 210px;
+    padding: 22px;
   }
 
   .hero-actions {

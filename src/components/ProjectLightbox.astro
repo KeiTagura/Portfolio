@@ -19,10 +19,14 @@ const renderedProjects = await Promise.all(
 
 <div class="project-lightbox" data-project-lightbox hidden>
   <div class="project-lightbox-panel" data-project-lightbox-panel role="dialog" aria-modal="true" tabindex="-1">
+    <button class="project-lightbox-side-nav project-lightbox-side-nav-prev" type="button" data-project-prev aria-label={`${ui.common.previous} project`}>
+      <span aria-hidden="true">‹</span>
+    </button>
+    <button class="project-lightbox-side-nav project-lightbox-side-nav-next" type="button" data-project-next aria-label={`${ui.common.next} project`}>
+      <span aria-hidden="true">›</span>
+    </button>
     <div class="project-lightbox-toolbar">
-      <button type="button" data-project-prev aria-label={`${ui.common.previous} project`}>{ui.common.previous}</button>
-      <button type="button" data-project-next aria-label={`${ui.common.next} project`}>{ui.common.next}</button>
-      <button type="button" data-project-close aria-label={ui.common.closePreview}>{ui.common.closePreview}</button>
+      <button class="project-lightbox-close" type="button" data-project-close aria-label={ui.common.closePreview}>{ui.common.closePreview}</button>
     </div>
 
     <div class="project-lightbox-media">
@@ -80,143 +84,273 @@ const renderedProjects = await Promise.all(
 }
 
 <script>
-  const projectLightbox = document.querySelector("[data-project-lightbox]");
-  const projectPanel = document.querySelector("[data-project-lightbox-panel]");
-  const projectImage = document.querySelector("[data-project-image]");
-  const projectVideo = document.querySelector("[data-project-video]");
-  const projectEmbed = document.querySelector("[data-project-embed]");
-  const projectExternal = document.querySelector("[data-project-external]");
-  const projectExternalLabel = document.querySelector("[data-project-external-label]");
-  const projectDetails = document.querySelector("[data-project-details]");
-  const closeProjectButton = document.querySelector("[data-project-close]");
-  const prevProjectButton = document.querySelector("[data-project-prev]");
-  const nextProjectButton = document.querySelector("[data-project-next]");
-  const projectTriggers = Array.from(document.querySelectorAll("[data-project-lightbox-trigger]"));
-  let currentProjectIndex = 0;
-  let previousFocus: Element | null = null;
+  function setupProjectLightbox() {
+    const projectLightbox = document.querySelector<HTMLElement>("[data-project-lightbox]");
+    const projectTriggers = Array.from(document.querySelectorAll("[data-project-lightbox-trigger]"));
 
-  function resetProjectMedia() {
-    if (projectImage instanceof HTMLImageElement) {
-      projectImage.hidden = true;
-      projectImage.removeAttribute("src");
-    }
-    if (projectVideo instanceof HTMLVideoElement) {
-      projectVideo.hidden = true;
-      projectVideo.pause();
-      projectVideo.removeAttribute("src");
-      projectVideo.load();
-    }
-    if (projectEmbed instanceof HTMLIFrameElement) {
-      projectEmbed.hidden = true;
-      projectEmbed.removeAttribute("src");
-    }
-    if (projectExternal instanceof HTMLAnchorElement) {
-      projectExternal.hidden = true;
-      projectExternal.href = "#";
-    }
-  }
-
-  function renderProjectMedia(trigger: HTMLElement) {
-    resetProjectMedia();
-    const mediaType = trigger.getAttribute("data-media-type") ?? "image";
-    const mediaSrc = trigger.getAttribute("data-media-src") ?? "";
-    const title = trigger.getAttribute("data-title") ?? "Project media";
-
-    if ((mediaType === "image" || mediaType === "gif") && projectImage instanceof HTMLImageElement) {
-      projectImage.src = mediaSrc;
-      projectImage.alt = `${title} media`;
-      projectImage.hidden = false;
+    if (!projectLightbox || projectLightbox.dataset.lightboxReady === "true" || projectTriggers.length === 0) {
       return;
     }
 
-    if (mediaType === "localVideo" && projectVideo instanceof HTMLVideoElement) {
-      projectVideo.src = mediaSrc;
-      projectVideo.hidden = false;
-      return;
+    const activeProjectLightbox = projectLightbox;
+    const projectPanel = activeProjectLightbox.querySelector<HTMLElement>("[data-project-lightbox-panel]");
+    const projectImage = activeProjectLightbox.querySelector<HTMLImageElement>("[data-project-image]");
+    const projectVideo = activeProjectLightbox.querySelector<HTMLVideoElement>("[data-project-video]");
+    const projectEmbed = activeProjectLightbox.querySelector<HTMLIFrameElement>("[data-project-embed]");
+    const projectExternal = activeProjectLightbox.querySelector<HTMLAnchorElement>("[data-project-external]");
+    const projectExternalLabel = activeProjectLightbox.querySelector<HTMLElement>("[data-project-external-label]");
+    const projectDetails = activeProjectLightbox.querySelector<HTMLElement>("[data-project-details]");
+    const closeProjectButton = activeProjectLightbox.querySelector("[data-project-close]");
+    const prevProjectButton = activeProjectLightbox.querySelector("[data-project-prev]");
+    const nextProjectButton = activeProjectLightbox.querySelector("[data-project-next]");
+    let currentProjectIndex = 0;
+    let previousFocus: Element | null = null;
+    let isProjectTransitioning = false;
+    let swipeStartX = 0;
+    let swipeStartY = 0;
+    let swipePointerId: number | null = null;
+    let lastSwipeAt = 0;
+
+    activeProjectLightbox.dataset.lightboxReady = "true";
+
+    function resetProjectMedia() {
+      if (projectImage) {
+        projectImage.hidden = true;
+        projectImage.removeAttribute("src");
+      }
+      if (projectVideo) {
+        projectVideo.hidden = true;
+        projectVideo.pause();
+        projectVideo.removeAttribute("src");
+        projectVideo.load();
+      }
+      if (projectEmbed) {
+        projectEmbed.hidden = true;
+        projectEmbed.removeAttribute("src");
+      }
+      if (projectExternal) {
+        projectExternal.hidden = true;
+        projectExternal.href = "#";
+      }
     }
 
-    if ((mediaType === "youtube" || mediaType === "vimeo") && projectEmbed instanceof HTMLIFrameElement) {
-      projectEmbed.src = mediaSrc;
-      projectEmbed.title = `${title} embedded media`;
-      projectEmbed.hidden = false;
-      return;
+    function renderProjectMedia(trigger: HTMLElement) {
+      resetProjectMedia();
+      const mediaType = trigger.getAttribute("data-media-type") ?? "image";
+      const mediaSrc = trigger.getAttribute("data-media-src") ?? "";
+      const title = trigger.getAttribute("data-title") ?? "Project media";
+
+      if ((mediaType === "image" || mediaType === "gif") && projectImage) {
+        projectImage.src = mediaSrc;
+        projectImage.alt = `${title} media`;
+        projectImage.hidden = false;
+        return;
+      }
+
+      if (mediaType === "localVideo" && projectVideo) {
+        projectVideo.src = mediaSrc;
+        projectVideo.hidden = false;
+        return;
+      }
+
+      if ((mediaType === "youtube" || mediaType === "vimeo") && projectEmbed) {
+        projectEmbed.src = mediaSrc;
+        projectEmbed.title = `${title} embedded media`;
+        projectEmbed.hidden = false;
+        return;
+      }
+
+      if (projectExternal) {
+        projectExternal.href = mediaSrc;
+        projectExternal.hidden = false;
+      }
+      if (projectExternalLabel) {
+        projectExternalLabel.textContent = `Open ${mediaType} media`;
+      }
     }
 
-    if (projectExternal instanceof HTMLAnchorElement) {
-      projectExternal.href = mediaSrc;
-      projectExternal.hidden = false;
+    function renderProjectDetails(index: number) {
+      if (!projectDetails) {
+        return;
+      }
+      const template = document.querySelector(`[data-project-template="${index}"]`);
+      if (template instanceof HTMLTemplateElement) {
+        projectDetails.replaceChildren(template.content.cloneNode(true));
+      }
     }
-    if (projectExternalLabel instanceof HTMLElement) {
-      projectExternalLabel.textContent = `Open ${mediaType} media`;
+
+    function setProjectContent(index: number, trigger: HTMLElement) {
+      currentProjectIndex = index;
+      renderProjectMedia(trigger);
+      renderProjectDetails(index);
+    }
+
+    function animateProjectTo(index: number, trigger: HTMLElement) {
+      if (!projectPanel || isProjectTransitioning) {
+        setProjectContent(index, trigger);
+        return;
+      }
+
+      isProjectTransitioning = true;
+      projectPanel.classList.add("is-changing");
+      window.setTimeout(() => {
+        setProjectContent(index, trigger);
+        window.requestAnimationFrame(() => {
+          projectPanel.classList.remove("is-changing");
+          isProjectTransitioning = false;
+        });
+      }, 140);
+    }
+
+    function openProject(index: number, animate = false) {
+      const normalizedIndex = (index + projectTriggers.length) % projectTriggers.length;
+      const trigger = projectTriggers[normalizedIndex];
+      if (!(trigger instanceof HTMLElement)) {
+        return;
+      }
+
+      const isAlreadyOpen = !activeProjectLightbox.hasAttribute("hidden");
+      if (animate && isAlreadyOpen) {
+        animateProjectTo(normalizedIndex, trigger);
+        return;
+      }
+
+      previousFocus = document.activeElement;
+      setProjectContent(normalizedIndex, trigger);
+      activeProjectLightbox.removeAttribute("hidden");
+      document.body.classList.add("has-lightbox");
+      projectPanel?.focus();
+    }
+
+    function closeProject() {
+      resetProjectMedia();
+      activeProjectLightbox.setAttribute("hidden", "");
+      document.body.classList.remove("has-lightbox");
+      if (previousFocus instanceof HTMLElement) {
+        previousFocus.focus();
+      }
+    }
+
+    function moveProject(direction: number) {
+      openProject(currentProjectIndex + direction, true);
+    }
+
+    function isSwipeControlTarget(target: EventTarget | null) {
+      return target instanceof Element && Boolean(target.closest("button, a, video, iframe"));
+    }
+
+    function startSwipe(clientX: number, clientY: number, target: EventTarget | null) {
+      if (isSwipeControlTarget(target)) {
+        return false;
+      }
+
+      swipeStartX = clientX;
+      swipeStartY = clientY;
+      return true;
+    }
+
+    function finishSwipe(clientX: number, clientY: number) {
+      const deltaX = clientX - swipeStartX;
+      const deltaY = clientY - swipeStartY;
+
+      if (Math.abs(deltaX) < 40 || Math.abs(deltaX) < Math.abs(deltaY) * 1.15) {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastSwipeAt < 260) {
+        return;
+      }
+
+      lastSwipeAt = now;
+      moveProject(deltaX > 0 ? -1 : 1);
+    }
+
+    projectTriggers.forEach((trigger, index) => {
+      trigger.addEventListener("click", () => openProject(index));
+    });
+
+    closeProjectButton?.addEventListener("click", closeProject);
+    prevProjectButton?.addEventListener("click", () => moveProject(-1));
+    nextProjectButton?.addEventListener("click", () => moveProject(1));
+    projectPanel?.addEventListener("pointerdown", (event) => {
+      if (!(event instanceof PointerEvent) || event.pointerType === "mouse") {
+        return;
+      }
+
+      if (!startSwipe(event.clientX, event.clientY, event.target)) {
+        return;
+      }
+      swipePointerId = event.pointerId;
+    });
+    projectPanel?.addEventListener("pointerup", (event) => {
+      if (!(event instanceof PointerEvent) || swipePointerId !== event.pointerId) {
+        return;
+      }
+
+      swipePointerId = null;
+      finishSwipe(event.clientX, event.clientY);
+    });
+    projectPanel?.addEventListener("pointercancel", (event) => {
+      if (event instanceof PointerEvent && swipePointerId === event.pointerId) {
+        swipePointerId = null;
+      }
+    });
+    projectPanel?.addEventListener(
+      "touchstart",
+      (event) => {
+        if (event.touches.length !== 1) {
+          return;
+        }
+
+        const touch = event.touches[0];
+        startSwipe(touch.clientX, touch.clientY, event.target);
+      },
+      { passive: true },
+    );
+    projectPanel?.addEventListener(
+      "touchend",
+      (event) => {
+        const touch = event.changedTouches[0];
+        if (!touch || isSwipeControlTarget(event.target)) {
+          return;
+        }
+
+        finishSwipe(touch.clientX, touch.clientY);
+      },
+      { passive: true },
+    );
+
+    activeProjectLightbox.addEventListener("click", (event) => {
+      if (event.target === activeProjectLightbox) {
+        closeProject();
+      }
+    });
+
+    const pageWindow = window as Window & { __portfolioProjectLightboxKeydown?: boolean };
+    if (!pageWindow.__portfolioProjectLightboxKeydown) {
+      pageWindow.__portfolioProjectLightboxKeydown = true;
+      document.addEventListener("keydown", (event) => {
+        const activeLightbox = document.querySelector<HTMLElement>("[data-project-lightbox]:not([hidden])");
+        if (!activeLightbox) {
+          return;
+        }
+
+        const activePrevButton = activeLightbox.querySelector<HTMLButtonElement>("[data-project-prev]");
+        const activeNextButton = activeLightbox.querySelector<HTMLButtonElement>("[data-project-next]");
+        const activeCloseButton = activeLightbox.querySelector<HTMLButtonElement>("[data-project-close]");
+
+        if (event.key === "Escape") {
+          activeCloseButton?.click();
+        } else if (event.key === "ArrowLeft") {
+          activePrevButton?.click();
+        } else if (event.key === "ArrowRight") {
+          activeNextButton?.click();
+        }
+      });
     }
   }
 
-  function renderProjectDetails(index: number) {
-    if (!(projectDetails instanceof HTMLElement)) {
-      return;
-    }
-    const template = document.querySelector(`[data-project-template="${index}"]`);
-    if (template instanceof HTMLTemplateElement) {
-      projectDetails.replaceChildren(template.content.cloneNode(true));
-    }
-  }
-
-  function openProject(index: number) {
-    const normalizedIndex = (index + projectTriggers.length) % projectTriggers.length;
-    const trigger = projectTriggers[normalizedIndex];
-    if (!(trigger instanceof HTMLElement)) {
-      return;
-    }
-
-    currentProjectIndex = normalizedIndex;
-    previousFocus = document.activeElement;
-    renderProjectMedia(trigger);
-    renderProjectDetails(normalizedIndex);
-    projectLightbox?.removeAttribute("hidden");
-    document.body.classList.add("has-lightbox");
-    if (projectPanel instanceof HTMLElement) {
-      projectPanel.focus();
-    }
-  }
-
-  function closeProject() {
-    resetProjectMedia();
-    projectLightbox?.setAttribute("hidden", "");
-    document.body.classList.remove("has-lightbox");
-    if (previousFocus instanceof HTMLElement) {
-      previousFocus.focus();
-    }
-  }
-
-  function moveProject(direction: number) {
-    openProject(currentProjectIndex + direction);
-  }
-
-  projectTriggers.forEach((trigger, index) => {
-    trigger.addEventListener("click", () => openProject(index));
-  });
-
-  closeProjectButton?.addEventListener("click", closeProject);
-  prevProjectButton?.addEventListener("click", () => moveProject(-1));
-  nextProjectButton?.addEventListener("click", () => moveProject(1));
-
-  projectLightbox?.addEventListener("click", (event) => {
-    if (event.target === projectLightbox) {
-      closeProject();
-    }
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (projectLightbox?.hasAttribute("hidden")) {
-      return;
-    }
-
-    if (event.key === "Escape") {
-      closeProject();
-    } else if (event.key === "ArrowLeft") {
-      moveProject(-1);
-    } else if (event.key === "ArrowRight") {
-      moveProject(1);
-    }
-  });
+  setupProjectLightbox();
+  document.addEventListener("astro:page-load", setupProjectLightbox);
 </script>
