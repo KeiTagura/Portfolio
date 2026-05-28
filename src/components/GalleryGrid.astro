@@ -74,6 +74,36 @@ function getSourceGalleryImage(mediaSrc: string) {
   return sourceGalleryImages[normalizedPath]?.default;
 }
 
+function getInferredGifVideoSources(mediaSrc: string) {
+  const normalizedPath = mediaSrc.startsWith("src/") ? `/${mediaSrc}` : mediaSrc;
+  const animatedPrefix = "/src/gallery/animated/";
+
+  if (!normalizedPath.startsWith(animatedPrefix) || !normalizedPath.toLowerCase().endsWith(".gif")) {
+    return {};
+  }
+
+  const fileName = normalizedPath.slice(animatedPrefix.length);
+  const baseName = fileName.replace(/\.gif$/i, "");
+
+  return {
+    webmSrc: `/media/gallery/animated-webm/${baseName}.webm`,
+    mp4Src: `/media/gallery/animated-mp4/${baseName}.mp4`,
+  };
+}
+
+function getGifVideoSources(item: (typeof items)[number]) {
+  if (item.data.mediaType !== "gif") {
+    return {};
+  }
+
+  const inferredSources = getInferredGifVideoSources(item.data.mediaSrc);
+
+  return {
+    webmSrc: item.data.webmSrc ?? inferredSources.webmSrc,
+    mp4Src: item.data.mp4Src ?? inferredSources.mp4Src,
+  };
+}
+
 function getClosestAspectClass(width: number, height: number) {
   const sourceRatio = width / height;
   const buckets = [
@@ -101,13 +131,27 @@ function getFallbackAspectClass(mediaType: string) {
 
 async function resolveGalleryMedia(item: (typeof items)[number]) {
   const sourceImage = ["image", "gif"].includes(item.data.mediaType) ? getSourceGalleryImage(item.data.mediaSrc) : undefined;
+  const videoSources = getGifVideoSources(item);
 
   if (!sourceImage) {
     return {
       ...item,
       thumbnailSrc: withBase(item.data.thumbnail ?? item.data.mediaSrc),
       mediaSrc: withBase(item.data.mediaSrc),
+      webmSrc: videoSources.webmSrc ? withBase(videoSources.webmSrc) : undefined,
+      mp4Src: videoSources.mp4Src ? withBase(videoSources.mp4Src) : undefined,
       aspectClass: getFallbackAspectClass(item.data.mediaType),
+    };
+  }
+
+  if (item.data.mediaType === "gif" && (videoSources.webmSrc || videoSources.mp4Src)) {
+    return {
+      ...item,
+      thumbnailSrc: item.data.thumbnail ? withBase(item.data.thumbnail) : withBaseIfNeeded(sourceImage.src),
+      mediaSrc: withBaseIfNeeded(sourceImage.src),
+      webmSrc: videoSources.webmSrc ? withBase(videoSources.webmSrc) : undefined,
+      mp4Src: videoSources.mp4Src ? withBase(videoSources.mp4Src) : undefined,
+      aspectClass: getClosestAspectClass(sourceImage.width, sourceImage.height),
     };
   }
 
@@ -127,6 +171,8 @@ async function resolveGalleryMedia(item: (typeof items)[number]) {
     ...item,
     thumbnailSrc: withBaseIfNeeded(thumbnail.src),
     mediaSrc: withBaseIfNeeded(fullImage.src),
+    webmSrc: undefined,
+    mp4Src: undefined,
     aspectClass: getClosestAspectClass(sourceImage.width, sourceImage.height),
   };
 }
@@ -162,16 +208,27 @@ const visibleResolvedItems = variant === "home" ? resolvedItems.slice(0, 10) : r
             <button
               type="button"
               class="gallery-media"
-              data-lightbox-trigger
-              data-lightbox-index={index}
-              data-media-type={item.data.mediaType}
-              data-media-src={item.mediaSrc}
-              data-title={lightboxTitle}
-              data-description={lightboxDescription}
-              data-alt={`${item.data.title} media preview`}
-              aria-label={`${ui.common.openMedia}: ${item.data.title}`}
-            >
-              <img src={item.thumbnailSrc} alt={`${item.data.title} thumbnail`} loading="lazy" />
+          data-lightbox-trigger
+          data-lightbox-index={index}
+          data-media-type={item.data.mediaType}
+          data-media-src={item.mediaSrc}
+          data-webm-src={item.webmSrc}
+          data-mp4-src={item.mp4Src}
+          data-title={lightboxTitle}
+          data-description={lightboxDescription}
+          data-alt={`${item.data.title} media preview`}
+          aria-label={`${ui.common.openMedia}: ${item.data.title}`}
+        >
+              {
+                item.data.mediaType === "gif" && (item.webmSrc || item.mp4Src) ? (
+                  <video autoplay muted loop playsinline preload="metadata" aria-label={`${item.data.title} animated preview`}>
+                    {item.webmSrc && <source src={item.webmSrc} type="video/webm" />}
+                    {item.mp4Src && <source src={item.mp4Src} type="video/mp4" />}
+                  </video>
+                ) : (
+                  <img src={item.thumbnailSrc} alt={`${item.data.title} thumbnail`} loading="lazy" />
+                )
+              }
               {
                 galleryThumbnail.showMediaType && item.data.mediaType !== "image" && (
                   <span class:list={["media-indicator", `media-${item.data.mediaType}`]}>{item.data.mediaType}</span>

@@ -69,6 +69,7 @@ const ui = getUi();
         lightboxVideo.hidden = true;
         lightboxVideo.pause();
         lightboxVideo.removeAttribute("src");
+        lightboxVideo.replaceChildren();
         lightboxVideo.load();
       }
       if (lightboxEmbed) {
@@ -95,8 +96,37 @@ const ui = getUi();
       resetLightboxMedia();
       const mediaType = trigger.getAttribute("data-media-type") ?? "image";
       const mediaSrc = trigger.getAttribute("data-media-src") ?? "";
+      const webmSrc = trigger.getAttribute("data-webm-src") ?? "";
+      const mp4Src = trigger.getAttribute("data-mp4-src") ?? "";
       const alt = trigger.getAttribute("data-alt") ?? "";
       const title = trigger.getAttribute("data-title") ?? "Gallery item";
+
+      if (mediaType === "gif" && lightboxVideo && (webmSrc || mp4Src)) {
+        lightboxVideo.muted = true;
+        lightboxVideo.loop = true;
+        lightboxVideo.autoplay = true;
+
+        if (webmSrc) {
+          const source = document.createElement("source");
+          source.src = webmSrc;
+          source.type = "video/webm";
+          lightboxVideo.append(source);
+        }
+
+        if (mp4Src) {
+          const source = document.createElement("source");
+          source.src = mp4Src;
+          source.type = "video/mp4";
+          lightboxVideo.append(source);
+        }
+
+        lightboxVideo.hidden = false;
+        lightboxVideo.load();
+        lightboxVideo.play().catch(() => {
+          // Browsers can still block autoplay; controls remain available.
+        });
+        return;
+      }
 
       if ((mediaType === "image" || mediaType === "gif") && lightboxImage) {
         lightboxImage.src = mediaSrc;

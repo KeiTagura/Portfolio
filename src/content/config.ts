@@ -37,6 +37,8 @@ const gallery = defineCollection({
       thumbnail: z.string().optional(),
       mediaType,
       mediaSrc: z.string(),
+      webmSrc: z.string().optional(),
+      mp4Src: z.string().optional(),
       tags: z.array(galleryTag).default([]),
       description: z.string().default(""),
       lightboxTitle: z.string().optional(),

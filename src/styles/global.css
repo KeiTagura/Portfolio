@@ -770,7 +770,8 @@ h3 {
 }
 
 .project-image img,
-.gallery-item img {
+.gallery-item img,
+.gallery-item video {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -779,7 +780,8 @@ h3 {
 }
 
 .project-card:hover .project-image img,
-.gallery-item:hover img {
+.gallery-item:hover img,
+.gallery-item:hover video {
   transform: scale(1.035);
 }
 
