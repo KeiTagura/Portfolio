@@ -1269,7 +1269,8 @@ h3 {
 .project-lightbox-media img[hidden],
 .project-lightbox-media video[hidden],
 .project-lightbox-media iframe[hidden],
-.project-external-card[hidden] {
+.project-external-card[hidden],
+.project-lightbox-action[hidden] {
   display: none !important;
 }
 
@@ -1346,6 +1347,27 @@ h3 {
   height: auto;
 }
 
+.project-lightbox-action {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  margin-top: clamp(12px, 2vw, 18px);
+}
+
+.project-lightbox-link {
+  justify-content: center;
+  min-width: min(180px, 100%);
+  background: rgba(87, 213, 255, 0.13);
+  color: var(--text);
+}
+
+.project-lightbox-link:hover,
+.project-lightbox-link:focus-visible {
+  border-color: rgba(87, 213, 255, 0.72);
+  background: rgba(87, 213, 255, 0.22);
+  color: #ffffff;
+}
+
 .project-external-card {
   display: grid;
   width: min(520px, 100%);
@@ -1375,13 +1397,6 @@ h3 {
 .project-lightbox-copy h2 {
   font-size: clamp(2rem, 5vw, 4rem);
   text-wrap: balance;
-}
-
-.project-link {
-  display: inline-flex;
-  margin-bottom: 22px;
-  color: var(--accent-2);
-  font-weight: 800;
 }
 
 .project-detail-list {

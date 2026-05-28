@@ -1,7 +1,6 @@
 ---
 import { render, type CollectionEntry } from "astro:content";
 import { getUi } from "@data/ui";
-import { withBase } from "../utils/paths";
 
 interface Props {
   projects: CollectionEntry<"projects">[];
@@ -37,6 +36,11 @@ const renderedProjects = await Promise.all(
         <span>{ui.common.externalMedia}</span>
         <strong data-project-external-label>{ui.common.externalMedia}</strong>
       </a>
+      <div class="project-lightbox-action" data-project-action hidden>
+        <a class="button project-lightbox-link" data-project-link href="#" target="_blank" rel="noreferrer">
+          {ui.common.projectLink}
+        </a>
+      </div>
     </div>
 
     <div class="project-lightbox-details" data-project-details></div>
@@ -52,11 +56,6 @@ const renderedProjects = await Promise.all(
           <span>{project.data.role}</span>
         </div>
         <h2>{project.data.title}</h2>
-        {project.data.projectUrl && (
-          <a class="project-link" href={withBase(project.data.projectUrl)} target="_blank" rel="noreferrer">
-            {ui.common.viewProject}
-          </a>
-        )}
         <dl class="project-detail-list">
           <div>
             <dt>{ui.common.role}</dt>
@@ -99,6 +98,8 @@ const renderedProjects = await Promise.all(
     const projectEmbed = activeProjectLightbox.querySelector<HTMLIFrameElement>("[data-project-embed]");
     const projectExternal = activeProjectLightbox.querySelector<HTMLAnchorElement>("[data-project-external]");
     const projectExternalLabel = activeProjectLightbox.querySelector<HTMLElement>("[data-project-external-label]");
+    const projectAction = activeProjectLightbox.querySelector<HTMLElement>("[data-project-action]");
+    const projectLink = activeProjectLightbox.querySelector<HTMLAnchorElement>("[data-project-link]");
     const projectDetails = activeProjectLightbox.querySelector<HTMLElement>("[data-project-details]");
     const closeProjectButton = activeProjectLightbox.querySelector("[data-project-close]");
     const prevProjectButton = activeProjectLightbox.querySelector("[data-project-prev]");
@@ -131,6 +132,12 @@ const renderedProjects = await Promise.all(
       if (projectExternal) {
         projectExternal.hidden = true;
         projectExternal.href = "#";
+      }
+      if (projectAction) {
+        projectAction.hidden = true;
+      }
+      if (projectLink) {
+        projectLink.href = "#";
       }
     }
 
@@ -169,6 +176,22 @@ const renderedProjects = await Promise.all(
       }
     }
 
+    function renderProjectAction(trigger: HTMLElement) {
+      if (!projectAction || !projectLink) {
+        return;
+      }
+
+      const projectUrl = trigger.getAttribute("data-project-url") ?? "";
+      if (!projectUrl) {
+        projectAction.hidden = true;
+        projectLink.href = "#";
+        return;
+      }
+
+      projectLink.href = projectUrl;
+      projectAction.hidden = false;
+    }
+
     function renderProjectDetails(index: number) {
       if (!projectDetails) {
         return;
@@ -182,6 +205,7 @@ const renderedProjects = await Promise.all(
     function setProjectContent(index: number, trigger: HTMLElement) {
       currentProjectIndex = index;
       renderProjectMedia(trigger);
+      renderProjectAction(trigger);
       renderProjectDetails(index);
     }
 

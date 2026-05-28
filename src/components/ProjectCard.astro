@@ -23,6 +23,7 @@ const ui = getUi();
     data-project-index={index}
     data-media-type={data.mediaType}
     data-media-src={withBase(data.mediaSrc)}
+    data-project-url={data.projectUrl ? withBase(data.projectUrl) : undefined}
     data-title={data.title}
     aria-label={`${ui.common.openProject}: ${data.title}`}
   ></button>
