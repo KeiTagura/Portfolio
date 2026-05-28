@@ -27,8 +27,6 @@ const ui = getUi();
         eyebrow={ui.sections.about.eyebrow}
         title={ui.sections.about.title}
         description={ui.sections.about.compactIntro}
-        actionHref={withBase("/about")}
-        actionLabel={ui.sections.about.actionLabel}
         variant="compact"
       />
     )
@@ -54,11 +52,4 @@ const ui = getUi();
       </div>
     </div>
   </div>
-  {
-    variant === "home" && (
-      <div class="section-cta">
-        <a class="text-link" href={withBase("/about")}>{ui.sections.about.actionLabel}</a>
-      </div>
-    )
-  }
 </section>

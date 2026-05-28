@@ -1,34 +1,37 @@
 ---
-title: "About Klein Grant"
+title: ""
 role: "Senior Programmer / Technical Artist"
 portrait: "/src/profilePic.png"
 location: "Vacaville, California, United States"
 availability: "Available for senior programming, technical art, VR/AR, tooling, and full-stack web work"
 focus:
   - Realtime rendering workflows
-  - Gameplay prototype feel
+  - Gameplay prototyping
   - Artist-friendly Unity tools
   - Stylized materials and VFX
-  - Unity, Godot and Unreal Engine development
+  - Unity, Godot, and Unreal Engine development
   - VR/AR and mobile optimization
   - Technical art and shader development
   - Pipeline tools and asset optimization
 ---
 
-I work where gameplay implementation and visual craft meet. My focus is building responsive prototypes, practical tools, and realtime visuals that help teams make creative decisions faster.
-I am a senior programmer and technical artist with over a decade of experience across game development, VR/AR solutions, and web platforms. My work spans Unity and Unreal Engine development, cross-platform optimization, technical art, shader development, and production tooling.
+I work at the intersection of gameplay implementation, technical art, and realtime visual development.
 
-I have led and supported technical teams, built custom editor tools, designed efficient asset and build pipelines, and delivered scalable systems for indie studios, startups, and global clients.
+I am a senior programmer and technical artist with over a decade of experience across game development, VR/AR, interactive media, and web platforms. My work includes Unity, Godot, and Unreal Engine development, cross-platform optimization, shader development, production tooling, and asset pipeline support.
+
+I have led small technical teams, mentored junior developers and artists, built custom editor tools, developed optimized VR/AR experiences, and created practical workflows that help artists, designers, and programmers iterate faster.
 
 ## Current Focus
 
-- Realtime rendering workflows that stay practical in production.
-- Gameplay prototypes with responsive feel and clear visual feedback.
-- VR/AR experiences optimized for mobile and standalone hardware.
-- Unity, Godot, Unreal Engine systems that remain stable across production.
-- Tools and pipelines that improve iteration speed for artists, designers, and QA.
-- Technical art workflows for shaders, look development, FX, simulation, and asset optimization.
+- Realtime rendering workflows for production-ready visuals
+- Responsive gameplay prototypes with clear visual feedback
+- VR/AR experiences optimized for mobile and standalone hardware
+- Stable Unity, Godot, and Unreal Engine systems
+- Artist-friendly tools that improve iteration speed
+- Technical mentorship, team support, and production guidance
+- Technical art workflows for shaders, look development, FX, and asset optimization
 
-## Links
 
-Additional work is available through the linked portfolio and GitHub profile.
+
+
+
