@@ -99,6 +99,7 @@ type HeroThreeSettings = {
     asciiColor: string;
     opacity: number;
     fontSize: string;
+    mobileFontSize: string;
     x: string;
     y: string;
   };
@@ -309,6 +310,7 @@ function readSettings(container: HTMLElement): HeroThreeSettings {
       asciiColor: container.dataset.backgroundTitleAsciiColor ?? "rgba(87, 213, 255, 0.18)",
       opacity: clampNumber(parseNumber(container.dataset.backgroundTitleOpacity ?? null, 1), 0, 1),
       fontSize: container.dataset.backgroundTitleFontSize ?? "clamp(5rem, 16vw, 13rem)",
+      mobileFontSize: container.dataset.backgroundTitleMobileFontSize ?? "clamp(2.8rem, 17vw, 5.5rem)",
       x: container.dataset.backgroundTitleX ?? "0%",
       y: container.dataset.backgroundTitleY ?? "0%",
     },
@@ -2685,6 +2687,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
 
     visualRoot?.style.setProperty("--hero-background-title-opacity", String(config.backgroundTitle.opacity));
     visualRoot?.style.setProperty("--hero-background-title-font-size", config.backgroundTitle.fontSize);
+    visualRoot?.style.setProperty("--hero-background-title-mobile-font-size", config.backgroundTitle.mobileFontSize);
     visualRoot?.style.setProperty("--hero-background-title-x", config.backgroundTitle.x);
     visualRoot?.style.setProperty("--hero-background-title-y", config.backgroundTitle.y);
     applySplitSettings(config);

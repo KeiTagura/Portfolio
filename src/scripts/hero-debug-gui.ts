@@ -96,6 +96,7 @@ type HeroDebugConfigShape = {
     asciiColor: string;
     opacity: number;
     fontSize: string;
+    mobileFontSize: string;
     x: string;
     y: string;
   };
@@ -499,6 +500,7 @@ function addBackgroundTitleFolder<Config extends PlainConfig>(
   folder.addColor(heroConfig.backgroundTitle, "asciiColor").name("asciiColor").onChange(apply);
   folder.add(heroConfig.backgroundTitle, "opacity", 0, 1, 0.01).name("opacity").onChange(apply);
   folder.add(heroConfig.backgroundTitle, "fontSize").name("fontSize").onChange(apply);
+  folder.add(heroConfig.backgroundTitle, "mobileFontSize").name("mobileFontSize").onChange(apply);
   folder.add(heroConfig.backgroundTitle, "x").name("x").onChange(apply);
   folder.add(heroConfig.backgroundTitle, "y").name("y").onChange(apply);
 

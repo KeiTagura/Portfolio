@@ -23,7 +23,27 @@ type SourceImage = {
 
 const { id, variant = "home" } = Astro.props;
 const showHeader = Astro.props.showHeader ?? variant === "home";
-const items = (await getCollection("gallery")).sort((a, b) => a.data.order - b.data.order);
+const items = (await getCollection("gallery")).sort((a, b) => {
+  const aSortSlot = a.data.override ?? a.data.order;
+  const bSortSlot = b.data.override ?? b.data.order;
+
+  if (aSortSlot !== bSortSlot) {
+    return aSortSlot - bSortSlot;
+  }
+
+  const aUsesOverride = typeof a.data.override === "number";
+  const bUsesOverride = typeof b.data.override === "number";
+
+  if (aUsesOverride !== bUsesOverride) {
+    return aUsesOverride ? -1 : 1;
+  }
+
+  if (a.data.order !== b.data.order) {
+    return a.data.order - b.data.order;
+  }
+
+  return a.id.localeCompare(b.id, undefined, { numeric: true });
+});
 const ui = getUi();
 const galleryThumbnail = site.galleryThumbnail;
 const showGalleryThumbnailMeta =

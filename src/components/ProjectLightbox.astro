@@ -273,7 +273,7 @@ const renderedProjects = await Promise.all(
     closeProjectButton?.addEventListener("click", closeProject);
     prevProjectButton?.addEventListener("click", () => moveProject(-1));
     nextProjectButton?.addEventListener("click", () => moveProject(1));
-    projectPanel?.addEventListener("pointerdown", (event) => {
+    activeProjectLightbox.addEventListener("pointerdown", (event) => {
       if (!(event instanceof PointerEvent) || event.pointerType === "mouse") {
         return;
       }
@@ -283,7 +283,7 @@ const renderedProjects = await Promise.all(
       }
       swipePointerId = event.pointerId;
     });
-    projectPanel?.addEventListener("pointerup", (event) => {
+    activeProjectLightbox.addEventListener("pointerup", (event) => {
       if (!(event instanceof PointerEvent) || swipePointerId !== event.pointerId) {
         return;
       }
@@ -291,12 +291,12 @@ const renderedProjects = await Promise.all(
       swipePointerId = null;
       finishSwipe(event.clientX, event.clientY);
     });
-    projectPanel?.addEventListener("pointercancel", (event) => {
+    activeProjectLightbox.addEventListener("pointercancel", (event) => {
       if (event instanceof PointerEvent && swipePointerId === event.pointerId) {
         swipePointerId = null;
       }
     });
-    projectPanel?.addEventListener(
+    activeProjectLightbox.addEventListener(
       "touchstart",
       (event) => {
         if (event.touches.length !== 1) {
@@ -308,7 +308,7 @@ const renderedProjects = await Promise.all(
       },
       { passive: true },
     );
-    projectPanel?.addEventListener(
+    activeProjectLightbox.addEventListener(
       "touchend",
       (event) => {
         const touch = event.changedTouches[0];
@@ -322,6 +322,10 @@ const renderedProjects = await Promise.all(
     );
 
     activeProjectLightbox.addEventListener("click", (event) => {
+      if (Date.now() - lastSwipeAt < 360) {
+        return;
+      }
+
       if (event.target === activeProjectLightbox) {
         closeProject();
       }

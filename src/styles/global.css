@@ -1025,6 +1025,7 @@ h3 {
   overflow-y: auto;
   padding: clamp(14px, 3vw, 34px);
   background: rgba(0, 0, 0, 0.86);
+  touch-action: pan-y;
 }
 
 .lightbox[hidden] {
@@ -1256,6 +1257,7 @@ h3 {
   overflow-y: auto;
   background: rgba(0, 0, 0, 0.88);
   padding: clamp(16px, 3vw, 34px);
+  touch-action: pan-y;
 }
 
 .project-lightbox[hidden] {
@@ -1780,12 +1782,27 @@ h3 {
     --scroll-cue-offset-x: 0;
   }
 
+  .lightbox,
+  .project-lightbox {
+    display: grid;
+    align-items: safe center;
+    justify-items: center;
+    padding: 10px;
+  }
+
+  .lightbox-panel,
+  .project-lightbox-panel {
+    max-height: calc(100svh - 20px);
+    min-height: auto;
+    overflow-y: auto;
+  }
+
   .project-lightbox {
     padding: 10px;
   }
 
   .project-lightbox-panel {
-    min-height: calc(100vh - 20px);
+    min-height: auto;
   }
 
   .project-lightbox-toolbar {

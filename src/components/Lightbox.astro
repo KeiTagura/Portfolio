@@ -252,7 +252,7 @@ const ui = getUi();
     closeButton?.addEventListener("click", closeLightbox);
     prevButton?.addEventListener("click", () => moveLightbox(-1));
     nextButton?.addEventListener("click", () => moveLightbox(1));
-    lightboxPanel?.addEventListener("pointerdown", (event) => {
+    activeLightbox.addEventListener("pointerdown", (event) => {
       if (!(event instanceof PointerEvent) || event.pointerType === "mouse") {
         return;
       }
@@ -262,7 +262,7 @@ const ui = getUi();
       }
       swipePointerId = event.pointerId;
     });
-    lightboxPanel?.addEventListener("pointerup", (event) => {
+    activeLightbox.addEventListener("pointerup", (event) => {
       if (!(event instanceof PointerEvent) || swipePointerId !== event.pointerId) {
         return;
       }
@@ -270,12 +270,12 @@ const ui = getUi();
       swipePointerId = null;
       finishSwipe(event.clientX, event.clientY);
     });
-    lightboxPanel?.addEventListener("pointercancel", (event) => {
+    activeLightbox.addEventListener("pointercancel", (event) => {
       if (event instanceof PointerEvent && swipePointerId === event.pointerId) {
         swipePointerId = null;
       }
     });
-    lightboxPanel?.addEventListener(
+    activeLightbox.addEventListener(
       "touchstart",
       (event) => {
         if (event.touches.length !== 1) {
@@ -287,7 +287,7 @@ const ui = getUi();
       },
       { passive: true },
     );
-    lightboxPanel?.addEventListener(
+    activeLightbox.addEventListener(
       "touchend",
       (event) => {
         const touch = event.changedTouches[0];
@@ -300,6 +300,10 @@ const ui = getUi();
       { passive: true },
     );
     activeLightbox.addEventListener("click", (event) => {
+      if (Date.now() - lastSwipeAt < 360) {
+        return;
+      }
+
       if (event.target === activeLightbox) {
         closeLightbox();
       }

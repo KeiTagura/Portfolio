@@ -1,7 +1,16 @@
 import { defineCollection, z } from "astro:content";
 
 const mediaType = z.enum(["image", "gif", "localVideo", "youtube", "vimeo", "x", "bluesky", "reddit"]);
-const galleryTag = z.enum(["Environmental", "Characters", "Animation", "Editor Tools", "3D Assets", "Pixel Art"]);
+const galleryTag = z.enum(
+  ["Environmental",
+  "Characters",
+  "Animation",
+  "Editor Tools",
+  "3D Assets",
+  "Pixel Art",
+  "FX",
+  "UI/UX",
+  "Texture/Shaders",]);
 
 const projects = defineCollection({
   type: "content",
@@ -35,6 +44,7 @@ const gallery = defineCollection({
       showLightboxTitle: z.boolean().default(true),
       showLightboxDescription: z.boolean().default(true),
       order: z.number().default(0),
+      override: z.number().optional(),
     })
     .superRefine((data, context) => {
       if (data.mediaType !== "image" && !data.thumbnail) {

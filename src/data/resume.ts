@@ -1,36 +1,110 @@
 export const workExperience = [
   {
-    company: "Independent Projects",
-    title: "Technical Artist / Gameplay Programmer",
-    startDate: "2024-01",
+    company: "Freelance / Contract",
+    title: "Developer",
+    startDate: "2023",
     endDate: "Present",
-    location: "Tokyo, Japan / Remote",
+    location: "Remote",
     summary:
-      "Built realtime visual prototypes, shader experiments, and gameplay systems for small teams and solo projects.",
+      "Delivered custom Unity and Unreal Engine solutions, full-stack web apps, and asset pipelines for clients.",
     bullets: [
-      "Created Unity tooling for rapid scene setup and debug visualization.",
-      "Prototyped responsive character controllers and camera systems.",
-      "Designed procedural material studies for stylized environments.",
+      "Supported startups and enterprise-level teams with scalable game systems and optimized codebases.",
+      "Produced 2D and 3D assets and handled asset integration for interactive experiences.",
+      "Maintained consistent technical growth while aligning freelance work with contract opportunities and market conditions.",
     ],
     projectLinks: [
       {
-        label: "Realtime Shader Playground",
-        href: "/projects",
+        label: "Portfolio",
+        href: "https://keitagura.portfoliobox.net",
       },
     ],
   },
   {
-    company: "Example Studio",
-    title: "Game Development Intern",
-    startDate: "2023-06",
-    endDate: "2024-03",
+    company: "Akupara Games",
+    title: "Senior Programmer",
+    startDate: "2022-09",
+    endDate: "2023-12",
+    location: "California, USA",
+    summary:
+      "Helped lead prototyping for VR experiences optimized for mobile hardware.",
+    bullets: [
+      "Built custom internal tools that streamlined workflows and supported design and QA teams.",
+      "Developed and maintained game codebases with a focus on scalable and stable builds.",
+      "Managed version control and automated deployment processes for multi-platform releases.",
+    ],
+    projectLinks: [],
+  },
+  {
+    company: "Vinci Games",
+    title: "Lead Developer",
+    startDate: "2020-01",
+    endDate: "2022-12",
+    location: "California, USA",
+    summary:
+      "Directed prototyping and full development of VR experiences optimized for mobile hardware.",
+    bullets: [
+      "Built and managed CI/CD pipelines for stable version delivery.",
+      "Coordinated asset optimization and QA to meet platform performance requirements.",
+      "Oversaw technical documentation and onboarding for developers and artists.",
+    ],
+    projectLinks: [],
+  },
+  {
+    company: "Vitei Backroom",
+    title: "Technical Artist",
+    startDate: "2017-12",
+    endDate: "2019-01",
+    location: "Kyoto, Japan",
+    summary:
+      "Contributed visual development for Universal Studios Japan's Lupin VR Coaster project.",
+    bullets: [
+      "Specialized in look development, FX, and simulation for production pipelines.",
+      "Developed editor tools that improved workflow efficiency for artists and designers.",
+      "Supported technical art needs through project completion.",
+    ],
+    projectLinks: [],
+  },
+  {
+    company: "KyotoVR",
+    title: "Lead Programmer",
+    startDate: "2016-09",
+    endDate: "2017-11",
+    location: "Kyoto, Japan",
+    summary:
+      "Created and managed custom Unity editor tools for interactive production work.",
+    bullets: [
+      "Accelerated iteration and testing cycles with custom Unity tooling.",
+      "Collaborated with asset production and procurement teams.",
+      "Improved real-time rendering and visual fidelity for 3D scan workflows.",
+    ],
+    projectLinks: [],
+  },
+  {
+    company: "Zeami",
+    title: "Web App Developer",
+    startDate: "2014-09",
+    endDate: "2016-11",
+    location: "Osaka, Japan",
+    summary:
+      "Built web and kiosk applications for product display and purchase workflows.",
+    bullets: [
+      "Developed product display and purchase web applications.",
+      "Built kiosk application experiences for customer-facing use.",
+    ],
+    projectLinks: [],
+  },
+  {
+    company: "Freelance / Contract",
+    title: "Developer",
+    startDate: "2010",
+    endDate: "2014",
     location: "Remote",
     summary:
-      "Supported gameplay feature implementation and visual polish for a shipped prototype.",
+      "Delivered custom Unity and Unreal Engine solutions, full-stack web apps, and asset pipelines for clients.",
     bullets: [
-      "Implemented UI states and animation hooks with designers.",
-      "Optimized scene assets and documented performance constraints.",
-      "Contributed bug fixes across gameplay, VFX, and editor scripts.",
+      "Supported startups and enterprise-level teams with scalable game systems and optimized codebases.",
+      "Produced 2D and 3D assets and handled integration for interactive experiences.",
+      "Balanced contract work across game systems, web apps, and asset pipelines.",
     ],
     projectLinks: [],
   },
@@ -38,42 +112,42 @@ export const workExperience = [
 
 export const hardSkills = [
   {
-    category: "Game Engines",
-    skills: ["Unity", "Unreal Engine", "Cinemachine", "VFX Graph", "Shader Graph"],
-  },
-  {
     category: "Programming",
-    skills: ["C#", "TypeScript", "JavaScript", "Python", "Gameplay Architecture"],
+    skills: ["C#", "C++", "JavaScript", "PHP", "SQL", "Zig"],
   },
   {
-    category: "Graphics / Shaders",
-    skills: ["HLSL", "Toon Lighting", "Post Processing", "Procedural Materials", "Optimization"],
+    category: "Game Engines / Platforms",
+    skills: ["Unity", "Unreal Engine", "VR/AR", "Android", "iOS"],
+  },
+  {
+    category: "Technical Art",
+    skills: ["Shader Development", "Look Development", "FX", "Simulation", "Asset Optimization"],
   },
   {
     category: "Tools / Pipeline",
-    skills: ["Editor Tooling", "Build Pipelines", "Profiling", "Git", "Documentation"],
+    skills: ["Pipeline Optimization", "Editor Tooling", "CI/CD", "Git", "QA Support"],
   },
   {
-    category: "Web",
-    skills: ["Astro", "HTML", "CSS", "Static Sites", "Responsive UI"],
+    category: "Web / Backend",
+    skills: ["Full-stack Web Apps", "AWS", "WebSocket", "Product Display Apps", "Kiosk Apps"],
   },
   {
     category: "3D / Art Tools",
-    skills: ["Blender", "Substance 3D Painter", "Aseprite", "Photoshop", "Figma"],
+    skills: ["Blender", "Substance Painter", "Photoshop"],
   },
 ];
 
 export const softSkills = [
-  "Cross-discipline communication",
-  "Rapid prototyping",
-  "Technical documentation",
-  "Performance-minded iteration",
-  "Clear handoff with artists and designers",
+  "Technical team leadership",
+  "Cross-discipline collaboration with artists, designers, and QA",
+  "Technical documentation and onboarding",
+  "Performance-minded optimization",
+  "Production pipeline design",
 ];
 
 export const languages = [
-  { name: "Japanese", level: "Native" },
-  { name: "English", level: "Professional working proficiency" },
+  { name: "English", level: "Fluent" },
+  { name: "Japanese", level: "Conversational" },
 ];
 
 export const resume = {

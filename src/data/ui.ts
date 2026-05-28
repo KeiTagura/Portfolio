@@ -16,6 +16,9 @@ export const galleryTags = [
   "Editor Tools",
   "3D Assets",
   "Pixel Art",
+  "FX",
+  "UI/UX",
+  "Texture/Shaders",
 ] as const;
 
 export const galleryFilters = ["All", ...galleryTags] as const;
