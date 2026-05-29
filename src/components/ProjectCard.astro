@@ -8,11 +8,15 @@ interface Props {
   project: CollectionEntry<"projects">;
   variant?: "home" | "page";
   index: number;
+  thumbnailSrc?: string;
+  mediaSrc?: string;
 }
 
-const { project, variant = "home", index } = Astro.props;
+const { project, variant = "home", index, thumbnailSrc, mediaSrc } = Astro.props;
 const { data } = project;
 const ui = getUi();
+const resolvedThumbnailSrc = thumbnailSrc ?? withBase(data.thumbnail);
+const resolvedMediaSrc = mediaSrc ?? withBase(data.mediaSrc);
 ---
 
 <article class:list={["project-card", `project-card-${variant}`]}>
@@ -22,13 +26,13 @@ const ui = getUi();
     data-project-lightbox-trigger
     data-project-index={index}
     data-media-type={data.mediaType}
-    data-media-src={withBase(data.mediaSrc)}
+    data-media-src={resolvedMediaSrc}
     data-project-url={data.projectUrl ? withBase(data.projectUrl) : undefined}
     data-title={data.title}
     aria-label={`${ui.common.openProject}: ${data.title}`}
   ></button>
   <div class="project-image" aria-hidden="true">
-    <img src={withBase(data.thumbnail)} alt={`${data.title} preview`} loading="lazy" />
+    <img src={resolvedThumbnailSrc} alt={`${data.title} preview`} loading="lazy" />
   </div>
   <div class="project-body">
     <div class="project-meta">

@@ -1,4 +1,5 @@
 ---
+import { getImage } from "astro:assets";
 import { getCollection } from "astro:content";
 import ProjectLightbox from "@components/ProjectLightbox.astro";
 import ProjectCard from "@components/ProjectCard.astro";
@@ -12,12 +13,66 @@ interface Props {
   variant?: "home" | "page";
 }
 
+type SourceImage = {
+  src: string;
+  width: number;
+  height: number;
+  format: "gif" | "svg" | "webp" | "avif" | "png" | "jpg" | "jpeg" | "tiff";
+};
+
 const { id, variant = "home" } = Astro.props;
 const showHeader = Astro.props.showHeader ?? variant === "home";
 const allProjects = (await getCollection("projects")).sort((a, b) => a.data.order - b.data.order);
 const projects = variant === "home" ? allProjects.filter((project) => project.data.featured) : allProjects;
-const visibleProjects = variant === "home" ? projects.slice(0, 4) : projects;
+const sourceProjectImages = import.meta.glob<{ default: SourceImage }>("/src/gallery/projects/**/*.{avif,gif,jpeg,jpg,png,webp}", {
+  eager: true,
+});
 const ui = getUi();
+
+function withBaseIfNeeded(path: string) {
+  const base = import.meta.env.BASE_URL;
+
+  if (base !== "/" && path.startsWith(base)) {
+    return path;
+  }
+
+  return withBase(path);
+}
+
+function getSourceProjectImage(path: string) {
+  const normalizedPath = path.startsWith("src/") ? `/${path}` : path;
+
+  return sourceProjectImages[normalizedPath]?.default;
+}
+
+async function resolveProjectMedia(project: (typeof projects)[number]) {
+  const thumbnailSource = getSourceProjectImage(project.data.thumbnail);
+  const mediaSource = project.data.mediaType === "image" ? getSourceProjectImage(project.data.mediaSrc) : undefined;
+  const thumbnail = thumbnailSource
+    ? await getImage({
+        src: thumbnailSource,
+        width: Math.min(thumbnailSource.width, 900),
+        format: "webp",
+        quality: 80,
+      })
+    : undefined;
+  const media = mediaSource
+    ? await getImage({
+        src: mediaSource,
+        width: Math.min(mediaSource.width, 2200),
+        quality: 88,
+      })
+    : undefined;
+
+  return {
+    project,
+    thumbnailSrc: thumbnail ? withBaseIfNeeded(thumbnail.src) : withBase(project.data.thumbnail),
+    mediaSrc: media ? withBaseIfNeeded(media.src) : withBase(project.data.mediaSrc),
+  };
+}
+
+const resolvedProjects = await Promise.all(projects.map(resolveProjectMedia));
+const visibleProjects = variant === "home" ? resolvedProjects.slice(0, 4) : resolvedProjects;
 ---
 
 <section class:list={["page-section", "featured-projects", `section-${variant}`]} id={id}>
@@ -34,7 +89,11 @@ const ui = getUi();
     )
   }
   <div class="project-grid">
-    {visibleProjects.map((project, index) => <ProjectCard project={project} variant={variant} index={index} />)}
+    {
+      visibleProjects.map(({ project, thumbnailSrc, mediaSrc }, index) => (
+        <ProjectCard project={project} variant={variant} index={index} thumbnailSrc={thumbnailSrc} mediaSrc={mediaSrc} />
+      ))
+    }
   </div>
   {
     variant === "home" && (
@@ -43,5 +102,5 @@ const ui = getUi();
       </div>
     )
   }
-  <ProjectLightbox projects={visibleProjects} />
+  <ProjectLightbox projects={visibleProjects.map(({ project }) => project)} />
 </section>
