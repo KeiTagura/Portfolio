@@ -1,4 +1,5 @@
 ---
+import { getImage } from "astro:assets";
 import { getCollection, render } from "astro:content";
 import SectionHeader from "@components/SectionHeader.astro";
 import { defaultLocale } from "@config/i18n";
@@ -11,6 +12,13 @@ interface Props {
   variant?: "home" | "page";
 }
 
+type SourceImage = {
+  src: string;
+  width: number;
+  height: number;
+  format: "gif" | "svg" | "webp" | "avif" | "png" | "jpg" | "jpeg" | "tiff";
+};
+
 const { id, variant = "home" } = Astro.props;
 const showHeader = Astro.props.showHeader ?? variant === "home";
 const aboutEntries = await getCollection("about");
@@ -18,6 +26,36 @@ const about =
   aboutEntries.find((entry) => entry.id.replace(/\.(md|mdx)$/, "") === defaultLocale) ?? aboutEntries[0];
 const { Content } = await render(about);
 const ui = getUi();
+const sourceImages = import.meta.glob<{ default: SourceImage }>("/src/**/*.{avif,gif,jpeg,jpg,png,webp}", {
+  eager: true,
+});
+
+function withBaseIfNeeded(path: string) {
+  const base = import.meta.env.BASE_URL;
+
+  if (base !== "/" && path.startsWith(base)) {
+    return path;
+  }
+
+  return withBase(path);
+}
+
+function getSourceImage(path: string) {
+  const normalizedPath = path.startsWith("src/") ? `/${path}` : path;
+
+  return sourceImages[normalizedPath]?.default;
+}
+
+const portraitSource = getSourceImage(about.data.portrait);
+const portraitImage = portraitSource
+  ? await getImage({
+      src: portraitSource,
+      width: Math.min(portraitSource.width, 900),
+      format: "webp",
+      quality: 84,
+    })
+  : undefined;
+const portraitSrc = portraitImage ? withBaseIfNeeded(portraitImage.src) : withBase(about.data.portrait);
 ---
 
 <section class:list={["page-section", "about-section", `section-${variant}`]} id={id}>
@@ -32,7 +70,7 @@ const ui = getUi();
     )
   }
   <div class="about-layout">
-    <img class="portrait" src={withBase(about.data.portrait)} alt={`${about.data.title} portrait placeholder`} loading="lazy" />
+    <img class="portrait" src={portraitSrc} alt={`${about.data.title} portrait placeholder`} loading="lazy" />
     <div class="about-copy">
       <p class="eyebrow">{about.data.role}</p>
       <h3>{about.data.title}</h3>

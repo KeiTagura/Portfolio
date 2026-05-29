@@ -23,7 +23,7 @@ const htmlLang = site.locale.split(/[_-]/)[0] || "en";
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="generator" content={Astro.generator} />
     <SEO title={title} description={description} image={image} />
-    <link rel="icon" href={withBase(site.favicon)} type="image/svg+xml" />
+    <link rel="icon" href={withBase(site.favicon)} />
     <ClientRouter />
   </head>
   <body>

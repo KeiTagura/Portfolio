@@ -74,6 +74,35 @@ function getSourceGalleryImage(mediaSrc: string) {
   return sourceGalleryImages[normalizedPath]?.default;
 }
 
+async function resolveGalleryThumbnail(path: string | undefined) {
+  if (!path) {
+    return undefined;
+  }
+
+  const sourceImage = getSourceGalleryImage(path);
+
+  if (!sourceImage) {
+    return {
+      src: withBase(path),
+      width: undefined,
+      height: undefined,
+    };
+  }
+
+  const thumbnail = await getImage({
+    src: sourceImage,
+    width: Math.min(sourceImage.width, galleryThumbnail.generatedWidth),
+    format: galleryThumbnail.generatedFormat as "webp" | "avif" | "png" | "jpg" | "jpeg",
+    quality: galleryThumbnail.generatedQuality,
+  });
+
+  return {
+    src: withBaseIfNeeded(thumbnail.src),
+    width: sourceImage.width,
+    height: sourceImage.height,
+  };
+}
+
 function getInferredGifVideoSources(mediaSrc: string) {
   const normalizedPath = mediaSrc.startsWith("src/") ? `/${mediaSrc}` : mediaSrc;
   const animatedPrefix = "/src/gallery/animated/";
@@ -134,20 +163,25 @@ async function resolveGalleryMedia(item: (typeof items)[number]) {
   const videoSources = getGifVideoSources(item);
 
   if (!sourceImage) {
+    const resolvedThumbnail = await resolveGalleryThumbnail(item.data.thumbnail);
+
     return {
       ...item,
-      thumbnailSrc: withBase(item.data.thumbnail ?? item.data.mediaSrc),
+      thumbnailSrc: resolvedThumbnail?.src ?? withBase(item.data.mediaSrc),
       mediaSrc: withBase(item.data.mediaSrc),
       webmSrc: videoSources.webmSrc ? withBase(videoSources.webmSrc) : undefined,
       mp4Src: videoSources.mp4Src ? withBase(videoSources.mp4Src) : undefined,
-      aspectClass: getFallbackAspectClass(item.data.mediaType),
+      aspectClass:
+        resolvedThumbnail?.width && resolvedThumbnail.height
+          ? getClosestAspectClass(resolvedThumbnail.width, resolvedThumbnail.height)
+          : getFallbackAspectClass(item.data.mediaType),
     };
   }
 
   if (item.data.mediaType === "gif" && (videoSources.webmSrc || videoSources.mp4Src)) {
     return {
       ...item,
-      thumbnailSrc: item.data.thumbnail ? withBase(item.data.thumbnail) : withBaseIfNeeded(sourceImage.src),
+      thumbnailSrc: withBaseIfNeeded(sourceImage.src),
       mediaSrc: withBaseIfNeeded(sourceImage.src),
       webmSrc: videoSources.webmSrc ? withBase(videoSources.webmSrc) : undefined,
       mp4Src: videoSources.mp4Src ? withBase(videoSources.mp4Src) : undefined,
