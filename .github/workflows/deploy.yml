@@ -6,6 +6,9 @@ on:
       - prod
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 permissions:
   contents: read
   pages: write
@@ -39,7 +42,7 @@ jobs:
           PUBLIC_BASE_PATH: ${{ vars.PUBLIC_BASE_PATH }}
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: dist
 
