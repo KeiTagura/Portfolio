@@ -9,9 +9,9 @@ export const site = {
   author: "Klein Grant",
   locale: "en_US",
   ogImage: "/og-image.jpg",
-  favicon: "/src/logo.png",
+  favicon: "/favicon.svg",
   navBrand: {
-    image: "/src/logo.png",
+    image: "/logo.png",
     imageAlt: "Klein Grant logo",
   },
   heroVisual: {
