@@ -299,26 +299,43 @@ const visibleResolvedItems = variant === "home" ? resolvedItems.slice(0, 10) : r
 </section>
 
 <script>
-  const filterButtons = document.querySelectorAll("[data-gallery-filter]");
-  const galleryItems = document.querySelectorAll("[data-tags]");
+  function setupGalleryFilters() {
+    document.querySelectorAll<HTMLElement>(".gallery-section").forEach((section) => {
+      if (section.dataset.galleryFilterReady === "true") {
+        return;
+      }
 
-  function setFilter(category: string) {
-    filterButtons.forEach((button) => {
-      button.setAttribute(
-        "aria-pressed",
-        button.getAttribute("data-gallery-filter") === category ? "true" : "false",
-      );
-    });
-    galleryItems.forEach((item) => {
-      const itemTags = item.getAttribute("data-tags")?.split("|") ?? [];
-      const shouldShow = category === "All" || itemTags.includes(category);
-      item.toggleAttribute("hidden", !shouldShow);
+      const filterButtons = Array.from(section.querySelectorAll<HTMLButtonElement>("[data-gallery-filter]"));
+      const galleryItems = Array.from(section.querySelectorAll<HTMLElement>("[data-tags]"));
+
+      if (filterButtons.length === 0 || galleryItems.length === 0) {
+        return;
+      }
+
+      section.dataset.galleryFilterReady = "true";
+
+      function setFilter(category: string) {
+        filterButtons.forEach((button) => {
+          button.setAttribute(
+            "aria-pressed",
+            button.getAttribute("data-gallery-filter") === category ? "true" : "false",
+          );
+        });
+        galleryItems.forEach((item) => {
+          const itemTags = item.getAttribute("data-tags")?.split("|") ?? [];
+          const shouldShow = category === "All" || itemTags.includes(category);
+          item.toggleAttribute("hidden", !shouldShow);
+        });
+      }
+
+      filterButtons.forEach((button) => {
+        button.addEventListener("click", () => setFilter(button.getAttribute("data-gallery-filter") ?? "All"));
+      });
+
+      setFilter("All");
     });
   }
 
-  filterButtons.forEach((button) => {
-    button.addEventListener("click", () => setFilter(button.getAttribute("data-gallery-filter") ?? "All"));
-  });
-
-  setFilter("All");
+  setupGalleryFilters();
+  document.addEventListener("astro:page-load", setupGalleryFilters);
 </script>
