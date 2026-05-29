@@ -117,7 +117,7 @@ export const hardSkills = [
   },
   {
     category: "Game Engines / Platforms",
-    skills: ["Unity", "Unreal Engine", "VR/AR", "Android", "iOS"],
+    skills: ["Unity", "Unreal Engine", "Godot" , "VR/AR", "Android", "iOS"],
   },
   {
     category: "Technical Art",
@@ -133,7 +133,7 @@ export const hardSkills = [
   },
   {
     category: "3D / Art Tools",
-    skills: ["Blender", "Substance Painter", "Photoshop"],
+    skills: ["Blender", "Cascadeur", "Marvelous Designer" , "Substance Painter", "Photoshop"],
   },
 ];
 
