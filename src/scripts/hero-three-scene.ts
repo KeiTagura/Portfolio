@@ -81,6 +81,12 @@ type TextureBackedMaterial = Material & {
   transparent?: boolean;
 };
 
+type MaterialFadeState = {
+  material: TextureBackedMaterial;
+  opacity: number;
+  transparent: boolean;
+};
+
 type HeroThreeSettings = {
   enabled: boolean;
   mode: string;
@@ -640,6 +646,49 @@ function disposeTexture(texture: Texture | null) {
   texture?.dispose();
 }
 
+function collectObjectFadeStates(object: Object3D) {
+  const states = new Map<TextureBackedMaterial, MaterialFadeState>();
+
+  object.traverse((child) => {
+    const renderable = child as Object3D & { material?: Material | Material[] };
+    if (!renderable.material) {
+      return;
+    }
+
+    const materials = Array.isArray(renderable.material) ? renderable.material : [renderable.material];
+    materials.forEach((material) => {
+      const fadeMaterial = material as TextureBackedMaterial;
+      if (!fadeMaterial || states.has(fadeMaterial)) {
+        return;
+      }
+
+      states.set(fadeMaterial, {
+        material: fadeMaterial,
+        opacity: typeof fadeMaterial.opacity === "number" ? fadeMaterial.opacity : 1,
+        transparent: Boolean(fadeMaterial.transparent),
+      });
+    });
+  });
+
+  return Array.from(states.values());
+}
+
+function setFadeStatesOpacity(states: MaterialFadeState[], opacityScale: number) {
+  states.forEach((state) => {
+    state.material.transparent = true;
+    state.material.opacity = state.opacity * opacityScale;
+    state.material.needsUpdate = true;
+  });
+}
+
+function restoreFadeStates(states: MaterialFadeState[]) {
+  states.forEach((state) => {
+    state.material.opacity = state.opacity;
+    state.material.transparent = state.transparent;
+    state.material.needsUpdate = true;
+  });
+}
+
 function getHeroDebugGuiRequest(settings: HeroThreeSettings) {
   const queryEnabled =
     settings.debugGui.enableWithQueryParam && new URLSearchParams(window.location.search).get("heroGui") === "1";
@@ -964,6 +1013,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
   const replacedModelMaterials = new Set<Material>();
   const modelOwnedTextures = new Set<Texture>();
 
+  let modelCrossfadeFrame = 0;
   let frameId = 0;
   let lastFrameTime = 0;
   let lastAsciiUpdate = -Infinity;
@@ -1322,6 +1372,73 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     replacedModelMaterials.clear();
   }
 
+  function renderModelSwapFrame() {
+    renderNormalSide();
+    renderAsciiLayer(performance.now(), true);
+  }
+
+  function finishModelCrossfade(
+    loadedFadeStates: MaterialFadeState[],
+    proceduralFadeStates: MaterialFadeState[],
+  ) {
+    restoreFadeStates(loadedFadeStates);
+    restoreFadeStates(proceduralFadeStates);
+    proceduralGroup.visible = false;
+    modelCrossfadeFrame = 0;
+    container.dataset.modelSwapRuntime = "crossfade-complete";
+    renderModelSwapFrame();
+  }
+
+  function crossfadeToLoadedModel(preparedLoadedFadeStates?: MaterialFadeState[]) {
+    window.cancelAnimationFrame(modelCrossfadeFrame);
+
+    if (!loadedModel || reduceMotion) {
+      if (loadedModel && preparedLoadedFadeStates) {
+        restoreFadeStates(preparedLoadedFadeStates);
+      }
+      proceduralGroup.visible = false;
+      container.dataset.modelSwapRuntime = reduceMotion ? "instant-reduced-motion" : "instant";
+      renderModelSwapFrame();
+      return;
+    }
+
+    const durationMs = 300;
+    const loadedFadeStates = preparedLoadedFadeStates ?? collectObjectFadeStates(loadedModel);
+    const proceduralFadeStates = collectObjectFadeStates(proceduralGroup);
+    let startTime = 0;
+
+    proceduralGroup.visible = true;
+    setFadeStatesOpacity(loadedFadeStates, 0);
+    setFadeStatesOpacity(proceduralFadeStates, 1);
+    container.dataset.modelSwapRuntime = "crossfading";
+
+    const step = (time: number) => {
+      if (disposed || !loadedModel) {
+        modelCrossfadeFrame = 0;
+        return;
+      }
+
+      if (startTime === 0) {
+        startTime = time;
+      }
+
+      const progress = clampNumber((time - startTime) / durationMs, 0, 1);
+      const easedProgress = progress * progress * (3 - 2 * progress);
+      setFadeStatesOpacity(loadedFadeStates, easedProgress);
+      setFadeStatesOpacity(proceduralFadeStates, 1 - easedProgress);
+      renderModelSwapFrame();
+
+      if (progress < 1) {
+        modelCrossfadeFrame = window.requestAnimationFrame(step);
+        return;
+      }
+
+      finishModelCrossfade(loadedFadeStates, proceduralFadeStates);
+    };
+
+    modelCrossfadeFrame = window.requestAnimationFrame(step);
+  }
+
   async function loadUrlModel() {
     if (!GLTFLoaderClass || !settings.modelUrl) {
       container.dataset.modelRuntime = "procedural";
@@ -1377,8 +1494,10 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
         loadedSurfaceSources.push({ geometry: mesh.geometry, object: mesh });
       });
 
+      const loadedFadeStates = collectObjectFadeStates(loadedModel);
+      setFadeStatesOpacity(loadedFadeStates, 0);
       root.add(loadedModel);
-      proceduralGroup.visible = false;
+      proceduralGroup.visible = true;
       if (loadedEdgeSources.length > 0) {
         asciiEdgeSources = loadedEdgeSources;
       }
@@ -1390,10 +1509,11 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
       setupModelAnimation(loadedModel, gltf.animations);
       controls?.target.copy(root.position);
       controls?.update();
-      renderNormalSide();
-      renderAsciiLayer(performance.now(), true);
+      crossfadeToLoadedModel(loadedFadeStates);
     } catch (error) {
       console.warn("Hero GLB model failed to load; using procedural fallback.", error);
+      window.cancelAnimationFrame(modelCrossfadeFrame);
+      modelCrossfadeFrame = 0;
       modelMixer?.stopAllAction();
       modelMixer = null;
       if (loadedModel) {
@@ -2744,6 +2864,7 @@ async function createHeroThreeScene(container: HTMLElement): Promise<HeroThreeCo
     destroy() {
       disposed = true;
       window.cancelAnimationFrame(frameId);
+      window.cancelAnimationFrame(modelCrossfadeFrame);
       window.clearTimeout(resumeAutoRotateTimer);
       resizeObserver.disconnect();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
