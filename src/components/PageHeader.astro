@@ -1,4 +1,5 @@
 ---
+import { getImage } from "astro:assets";
 import { withBase } from "../utils/paths";
 
 interface Props {
@@ -11,16 +12,61 @@ interface Props {
   visualAccent?: string;
 }
 
+type SourceImage = {
+  src: string;
+  width: number;
+  height: number;
+  format: "gif" | "svg" | "webp" | "avif" | "png" | "jpg" | "jpeg" | "tiff";
+};
+
 const { eyebrow, kicker, title, intro, backgroundImage, backgroundAlt = "", visualAccent } = Astro.props;
 const headerStyle = visualAccent ? `--page-accent: ${visualAccent};` : undefined;
 const label = eyebrow ?? kicker;
+const sourceImages = import.meta.glob<{ default: SourceImage }>("/src/**/*.{avif,jpeg,jpg,png,webp}", {
+  eager: true,
+});
+
+function withBaseIfNeeded(path: string) {
+  const base = import.meta.env.BASE_URL;
+
+  if (base !== "/" && path.startsWith(base)) {
+    return path;
+  }
+
+  return withBase(path);
+}
+
+function getSourceImage(path: string | undefined) {
+  if (!path) {
+    return undefined;
+  }
+
+  const normalizedPath = path.startsWith("src/") ? `/${path}` : path;
+
+  return sourceImages[normalizedPath]?.default;
+}
+
+const headerSourceImage = getSourceImage(backgroundImage);
+const optimizedHeaderImage = headerSourceImage
+  ? await getImage({
+      src: headerSourceImage,
+      width: Math.min(headerSourceImage.width, 1800),
+      format: "webp",
+      quality: 82,
+    })
+  : undefined;
+const resolvedBackgroundImage = optimizedHeaderImage
+  ? withBaseIfNeeded(optimizedHeaderImage.src)
+  : backgroundImage
+    ? withBase(backgroundImage)
+    : undefined;
 ---
 
-<header class:list={["page-header", { "has-page-media": Boolean(backgroundImage) }]} style={headerStyle}>
+<header class:list={["page-header", { "has-page-media": Boolean(resolvedBackgroundImage) }]} style={headerStyle}>
   {
-    backgroundImage && (
+    resolvedBackgroundImage && (
       <div class="page-header-media" aria-hidden={backgroundAlt ? undefined : "true"}>
-        <img src={withBase(backgroundImage)} alt={backgroundAlt} loading="eager" />
+        <img src={resolvedBackgroundImage} alt={backgroundAlt} loading="eager" />
       </div>
     )
   }
