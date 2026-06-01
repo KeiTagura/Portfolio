@@ -885,7 +885,7 @@ h3 {
     transform 160ms ease;
 }
 
-.gallery-filter button[aria-pressed] {
+.gallery-filter button[aria-pressed="true"] {
   border-color: var(--accent);
   background: rgba(87, 213, 255, 0.12);
   color: var(--text);

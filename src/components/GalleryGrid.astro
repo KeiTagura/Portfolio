@@ -299,6 +299,47 @@ const visibleResolvedItems = variant === "home" ? resolvedItems.slice(0, 10) : r
 </section>
 
 <script>
+  function slugifyGalleryTag(tag: string) {
+    return tag
+      .trim()
+      .toLowerCase()
+      .replace(/&/g, "and")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
+
+  function createGalleryTagSlugMap(filterButtons: HTMLButtonElement[]) {
+    return new Map(
+      filterButtons
+        .map((button) => button.getAttribute("data-gallery-filter"))
+        .filter((filter): filter is string => Boolean(filter) && filter !== "All")
+        .map((filter) => [slugifyGalleryTag(filter), filter]),
+    );
+  }
+
+  function parseUrlGalleryTags(galleryTagSlugMap: Map<string, string>) {
+    const params = new URLSearchParams(window.location.search);
+    const rawTags = [...params.getAll("tag"), ...params.getAll("tags").flatMap((value) => value.split(","))];
+
+    return rawTags
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+      .map((tag) => galleryTagSlugMap.get(slugifyGalleryTag(tag)) ?? tag)
+      .filter((tag) => galleryTagSlugMap.has(slugifyGalleryTag(tag)));
+  }
+
+  function updateGalleryTagUrl(selectedTags: Set<string>) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("tag");
+    url.searchParams.delete("tags");
+
+    if (selectedTags.size > 0) {
+      url.searchParams.set("tags", Array.from(selectedTags).map(slugifyGalleryTag).join(","));
+    }
+
+    window.history.replaceState(window.history.state, "", url);
+  }
+
   function setupGalleryFilters() {
     document.querySelectorAll<HTMLElement>(".gallery-section").forEach((section) => {
       if (section.dataset.galleryFilterReady === "true") {
@@ -313,26 +354,42 @@ const visibleResolvedItems = variant === "home" ? resolvedItems.slice(0, 10) : r
       }
 
       section.dataset.galleryFilterReady = "true";
+      const galleryTagSlugMap = createGalleryTagSlugMap(filterButtons);
+      const selectedTags = new Set(parseUrlGalleryTags(galleryTagSlugMap));
 
-      function setFilter(category: string) {
+      function applyFilters() {
         filterButtons.forEach((button) => {
-          button.setAttribute(
-            "aria-pressed",
-            button.getAttribute("data-gallery-filter") === category ? "true" : "false",
-          );
+          const category = button.getAttribute("data-gallery-filter") ?? "All";
+          const isPressed = selectedTags.size === 0 ? category === "All" : selectedTags.has(category);
+
+          button.setAttribute("aria-pressed", isPressed ? "true" : "false");
         });
         galleryItems.forEach((item) => {
           const itemTags = item.getAttribute("data-tags")?.split("|") ?? [];
-          const shouldShow = category === "All" || itemTags.includes(category);
+          const shouldShow = selectedTags.size === 0 || itemTags.some((tag) => selectedTags.has(tag));
+
           item.toggleAttribute("hidden", !shouldShow);
         });
       }
 
       filterButtons.forEach((button) => {
-        button.addEventListener("click", () => setFilter(button.getAttribute("data-gallery-filter") ?? "All"));
+        button.addEventListener("click", () => {
+          const category = button.getAttribute("data-gallery-filter") ?? "All";
+
+          if (category === "All") {
+            selectedTags.clear();
+          } else if (selectedTags.has(category)) {
+            selectedTags.delete(category);
+          } else {
+            selectedTags.add(category);
+          }
+
+          updateGalleryTagUrl(selectedTags);
+          applyFilters();
+        });
       });
 
-      setFilter("All");
+      applyFilters();
     });
   }
 
