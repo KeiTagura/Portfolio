@@ -1,0 +1,14 @@
+---
+import PageHeader from "@components/PageHeader.astro";
+import ServicesSection from "@components/ServicesSection.astro";
+import { site } from "@config/site";
+import BaseLayout from "@layouts/BaseLayout.astro";
+
+const header = site.pageHeaders.services;
+const meta = site.pages.services;
+---
+
+<BaseLayout title={meta.title} description={meta.description}>
+  <PageHeader {...header} />
+  <ServicesSection variant="page" />
+</BaseLayout>

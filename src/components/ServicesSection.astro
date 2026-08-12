@@ -1,0 +1,68 @@
+---
+import SectionHeader from "@components/SectionHeader.astro";
+import { serviceEngagements, serviceIntro, serviceOfferings } from "@data/services";
+import { getUi } from "@data/ui";
+import { withBase } from "../utils/paths";
+
+interface Props {
+  id?: string;
+  showHeader?: boolean;
+  variant?: "home" | "page";
+}
+
+const { id, variant = "home" } = Astro.props;
+const showHeader = Astro.props.showHeader ?? variant === "home";
+const ui = getUi();
+const visibleServices = variant === "home" ? serviceOfferings.slice(0, 4) : serviceOfferings;
+---
+
+<section class:list={["page-section", "services-section", `section-${variant}`]} id={id}>
+  {
+    showHeader && (
+      <SectionHeader
+        eyebrow={ui.sections.services.eyebrow}
+        title={ui.sections.services.title}
+        description={ui.sections.services.compactIntro}
+        actionHref={withBase("/services")}
+        actionLabel={ui.sections.services.actionLabel}
+        variant="compact"
+      />
+    )
+  }
+  <div class="services-layout">
+    <aside class="services-summary">
+      <p class="eyebrow">Contract Support</p>
+      <h3>{serviceIntro.availability}</h3>
+      <p>{serviceIntro.summary}</p>
+      <div class="tag-list" aria-label="Common engagement types">
+        {serviceEngagements.map((engagement) => <span>{engagement}</span>)}
+      </div>
+      <a class="text-link" href={withBase("/contact")}>Start a conversation</a>
+    </aside>
+    <div class="service-grid">
+      {
+        visibleServices.map((service) => (
+          <article class="service-card">
+            <div>
+              <h3>{service.title}</h3>
+              <p>{service.summary}</p>
+            </div>
+            <ul>
+              {service.bullets.map((bullet) => <li>{bullet}</li>)}
+            </ul>
+            <div class="tool-list">
+              {service.tools.map((tool) => <span>{tool}</span>)}
+            </div>
+          </article>
+        ))
+      }
+    </div>
+  </div>
+  {
+    variant === "home" && (
+      <div class="section-cta">
+        <a class="text-link" href={withBase("/services")}>{ui.sections.services.actionLabel}</a>
+      </div>
+    )
+  }
+</section>

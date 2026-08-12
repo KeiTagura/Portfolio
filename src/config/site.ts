@@ -163,6 +163,12 @@ export const site = {
       description:
         "A visual collection of environments, characters, animation tests, editor tools, 3D assets, pixel art, GIFs, and video work.",
     },
+    services: {
+      path: "/services",
+      title: "Services",
+      description:
+        "Contract services for technical art, game prototyping, tools, optimization, realtime web experiences, and training.",
+    },
     about: {
       path: "/about",
       title: "About",
@@ -221,6 +227,13 @@ export const site = {
       backgroundImage: "/src/visualHeader.png",
       backgroundAlt: "Abstract gallery contact sheet background",
       visualAccent: "#ffcf5a",
+    },
+    services: {
+      eyebrow: "Contract Work",
+      title: "Services",
+      intro:
+        "Technical art, gameplay prototyping, tooling, optimization, realtime web work, and training support for teams that need hands-on production help.",
+      visualAccent: "#57d5ff",
     },
     about: {
       eyebrow: "Profile",

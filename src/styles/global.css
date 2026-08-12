@@ -864,6 +864,93 @@ h3 {
   color: var(--accent-2);
 }
 
+.services-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.34fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.services-summary,
+.service-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 44%),
+    rgba(21, 26, 35, 0.74);
+}
+
+.services-summary {
+  position: sticky;
+  top: calc(var(--nav-height) + 24px);
+  padding: 24px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+}
+
+.services-summary h3 {
+  margin-bottom: 12px;
+  font-size: clamp(1.25rem, 2vw, 1.75rem);
+}
+
+.services-summary p:not(.eyebrow),
+.service-card p {
+  color: var(--muted);
+}
+
+.services-summary .tag-list {
+  margin: 20px 0;
+}
+
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.service-card {
+  position: relative;
+  display: grid;
+  min-height: 310px;
+  align-content: space-between;
+  overflow: hidden;
+  padding: 22px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.service-card::before {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(87, 213, 255, 0.13), transparent 42%),
+    radial-gradient(circle at 92% 10%, rgba(255, 207, 90, 0.14), transparent 34%);
+  content: "";
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.service-card > * {
+  position: relative;
+}
+
+.service-card:hover {
+  border-color: rgba(87, 213, 255, 0.34);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.26);
+  transform: translateY(-2px);
+}
+
+.service-card h3 {
+  margin-bottom: 10px;
+}
+
+.service-card ul {
+  margin: 18px 0;
+  padding-left: 18px;
+  color: var(--muted);
+}
+
 .gallery-filter {
   display: flex;
   flex-wrap: wrap;
@@ -1706,6 +1793,7 @@ h3 {
   }
 
   .section-header,
+  .services-layout,
   .about-layout,
   .experience-layout {
     display: block;
@@ -1733,6 +1821,7 @@ h3 {
   }
 
   .project-grid,
+  .service-grid,
   .contact-grid,
   .profile-link-grid {
     grid-template-columns: 1fr;
@@ -1750,8 +1839,14 @@ h3 {
     margin-top: 18px;
   }
 
+  .services-summary {
+    position: static;
+    margin-bottom: 18px;
+  }
+
   .project-card:hover,
   .gallery-item:hover,
+  .service-card:hover,
   .contact-card:hover {
     transform: none;
   }
@@ -1918,6 +2013,8 @@ h3 {
   .project-body,
   .gallery-item > div,
   .about-copy,
+  .services-summary,
+  .service-card,
   .skills-panel,
   .timeline-item {
     padding: 18px;

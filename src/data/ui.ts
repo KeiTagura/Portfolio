@@ -4,6 +4,7 @@ export const navItems = [
   { label: "Home", href: "/" },
   { label: "Featured Projects", href: "/projects" },
   { label: "Gallery", href: "/gallery" },
+  { label: "Services", href: "/services" },
   { label: "About", href: "/about" },
   { label: "Experience / Skills", href: "/experience" },
   { label: "Contact", href: "/contact" },
@@ -52,6 +53,12 @@ export const uiText = {
         compactIntro: "",
         actionLabel: "View full gallery",
       },
+      services: {
+        eyebrow: "Services",
+        title: "Contract Services",
+        compactIntro: "Technical art, gameplay prototyping, tools, optimization, and training support for realtime teams.",
+        actionLabel: "View services",
+      },
       about: {
         eyebrow: "Profile",
         title: "About",
@@ -99,6 +106,12 @@ export const uiText = {
         title: "Gallery",
         compactIntro: "",
         actionLabel: "View full gallery",
+      },
+      services: {
+        eyebrow: "Services",
+        title: "Contract Services",
+        compactIntro: "Technical art, gameplay prototyping, tools, optimization, and training support for realtime teams.",
+        actionLabel: "View services",
       },
       about: {
         eyebrow: "Profile",
